@@ -1,0 +1,424 @@
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media.Animation;
+using System.Windows.Threading;
+using TopIsland.Controls;
+using TopIsland.Models;
+using TopIsland.Services;
+
+namespace TopIsland;
+
+public partial class MainWindow : Window
+{
+    private enum SurfaceState
+    {
+        Idle,
+        Hover,
+        Peek,
+        Expanded
+    }
+
+    private readonly SettingsStore _settingsStore = new();
+    private readonly ThemeService _themeService = new();
+    private readonly SystemStatsService _statsService = new();
+    private readonly DispatcherTimer _statsTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _themeTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _peekTimer = new();
+    private readonly DispatcherTimer _collapseTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+
+    private AppSettings _settings = new();
+    private SurfaceState _state = SurfaceState.Idle;
+    private bool _lastSystemLight;
+    private bool _initializing = true;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        _settings = _settingsStore.Load();
+        _peekTimer.Interval = TimeSpan.FromMilliseconds(Math.Clamp(_settings.HoverPeekDelayMs, 120, 2000));
+        _peekTimer.Tick += PeekTimer_Tick;
+        _collapseTimer.Tick += CollapseTimer_Tick;
+        _statsTimer.Tick += StatsTimer_Tick;
+        _themeTimer.Tick += ThemeTimer_Tick;
+        SizeChanged += (_, _) => UpdateGeometry();
+        Loaded += MainWindow_Loaded;
+    }
+
+    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        _themeService.Apply(_settings.Theme);
+        _lastSystemLight = _themeService.IsSystemLightTheme();
+        SyncSettingsUi();
+
+        _state = _settings.StartExpanded ? SurfaceState.Expanded : SurfaceState.Idle;
+        ApplyState(immediate: true);
+        UpdateLiveData();
+
+        _statsTimer.Start();
+        _themeTimer.Start();
+        _initializing = false;
+    }
+
+    private void Root_MouseEnter(object sender, MouseEventArgs e)
+    {
+        _collapseTimer.Stop();
+        if (_state == SurfaceState.Expanded)
+        {
+            return;
+        }
+
+        _state = SurfaceState.Hover;
+        ApplyState();
+
+        if (_settings.EnableHoverPeek)
+        {
+            _peekTimer.Stop();
+            _peekTimer.Start();
+        }
+    }
+
+    private void Root_MouseLeave(object sender, MouseEventArgs e)
+    {
+        _peekTimer.Stop();
+        if (_state == SurfaceState.Expanded)
+        {
+            _collapseTimer.Stop();
+            _collapseTimer.Start();
+            return;
+        }
+
+        _state = SurfaceState.Idle;
+        ApplyState();
+    }
+
+    private void PeekTimer_Tick(object? sender, EventArgs e)
+    {
+        _peekTimer.Stop();
+        if (_state != SurfaceState.Hover || !IsMouseOver)
+        {
+            return;
+        }
+
+        _state = SurfaceState.Peek;
+        ApplyState();
+    }
+
+
+    private void CollapseTimer_Tick(object? sender, EventArgs e)
+    {
+        _collapseTimer.Stop();
+        if (_state == SurfaceState.Expanded && !IsMouseOver)
+        {
+            _state = SurfaceState.Idle;
+            ApplyState();
+        }
+    }
+
+    private void CompactBar_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _peekTimer.Stop();
+        _state = _state == SurfaceState.Expanded ? SurfaceState.Idle : SurfaceState.Expanded;
+        ApplyState();
+    }
+
+    private void ApplyState(bool immediate = false)
+    {
+        var target = ResolveLayout(_state);
+        var duration = immediate ? 0 : (_state == SurfaceState.Expanded ? 300 : 170);
+        var heightDelay = !immediate && _settings.Style == IslandStyle.Notch && _state == SurfaceState.Expanded ? 40 : 0;
+
+        var baseWidthForState = ResolveBaseSurfaceWidth(SystemParameters.PrimaryScreenWidth);
+        NetworkCompact.Visibility = baseWidthForState >= 980 || _state is SurfaceState.Peek or SurfaceState.Expanded
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        if (_state == SurfaceState.Expanded)
+        {
+            ExpandedPanel.Visibility = Visibility.Visible;
+            AnimateOpacity(ExpandedPanel, 1, immediate ? 0 : 210, immediate ? 0 : 80);
+        }
+        else
+        {
+            AnimateOpacity(ExpandedPanel, 0, immediate ? 0 : 120, 0, hideOnComplete: true);
+        }
+
+        SurfacePath.SetResourceReference(System.Windows.Shapes.Path.FillProperty,
+            _state is SurfaceState.Hover or SurfaceState.Peek ? "SurfaceHoverBrush" : "SurfaceBrush");
+        SurfaceShadow.BlurRadius = _state == SurfaceState.Idle ? 22 : 28;
+        SurfaceShadow.Opacity = _state == SurfaceState.Idle ? 0.30 : 0.40;
+
+        ConfigureContentMargins();
+        AnimateWindow(target.Width, target.Height, target.Top, duration, heightDelay);
+        UpdateGeometry();
+    }
+
+    private (double Width, double Height, double Top) ResolveLayout(SurfaceState state)
+    {
+        var screenWidth = SystemParameters.PrimaryScreenWidth;
+        var baseWidth = ResolveBaseSurfaceWidth(screenWidth);
+        double surfaceWidth;
+        double windowHeight;
+
+        switch (state)
+        {
+            case SurfaceState.Hover:
+                surfaceWidth = baseWidth * (_settings.Style == IslandStyle.Notch ? 1.13 : 1.055);
+                windowHeight = _settings.Style == IslandStyle.Notch ? 70 : 84;
+                break;
+            case SurfaceState.Peek:
+                surfaceWidth = baseWidth * (_settings.Style == IslandStyle.Notch ? 1.18 : 1.11);
+                windowHeight = _settings.Style == IslandStyle.Notch ? 76 : 90;
+                break;
+            case SurfaceState.Expanded:
+                surfaceWidth = Math.Min(Math.Max(baseWidth * 1.38, 820), screenWidth - _settings.SideMargin * 2);
+                windowHeight = 304;
+                break;
+            default:
+                surfaceWidth = baseWidth;
+                windowHeight = _settings.Style == IslandStyle.Notch ? 62 : 76;
+                break;
+        }
+
+        surfaceWidth = Math.Clamp(surfaceWidth, 220, Math.Max(220, screenWidth - _settings.SideMargin * 2));
+        var windowWidth = surfaceWidth + IslandGeometryFactory.ShadowPadding * 2;
+        var top = _settings.Style == IslandStyle.Notch ? 0 : state switch
+        {
+            SurfaceState.Hover => 10,
+            SurfaceState.Peek => 11,
+            _ => 8
+        };
+        return (windowWidth, windowHeight, top);
+    }
+
+    private double ResolveBaseSurfaceWidth(double screenWidth)
+    {
+        return _settings.WidthPreset switch
+        {
+            WidthPreset.Authentic => 300,
+            WidthPreset.Compact => 390,
+            WidthPreset.Standard => 560,
+            WidthPreset.Wide => screenWidth * 0.64,
+            WidthPreset.FullWidth => screenWidth - _settings.SideMargin * 2,
+            WidthPreset.Custom => _settings.CustomWidth,
+            _ => 560
+        };
+    }
+
+    private void AnimateWindow(double targetWidth, double targetHeight, double targetTop, int durationMs, int heightDelayMs)
+    {
+        var screenWidth = SystemParameters.PrimaryScreenWidth;
+        var targetLeft = (screenWidth - targetWidth) / 2.0;
+
+        if (durationMs <= 0)
+        {
+            BeginAnimation(WidthProperty, null);
+            BeginAnimation(HeightProperty, null);
+            BeginAnimation(LeftProperty, null);
+            BeginAnimation(TopProperty, null);
+            Width = targetWidth;
+            Height = targetHeight;
+            Left = targetLeft;
+            Top = targetTop;
+            UpdateGeometry();
+            return;
+        }
+
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        BeginAnimation(WidthProperty, CreateAnimation(ActualWidth > 0 ? ActualWidth : Width, targetWidth, durationMs, 0, ease));
+        BeginAnimation(LeftProperty, CreateAnimation(double.IsNaN(Left) ? targetLeft : Left, targetLeft, durationMs, 0, ease));
+        BeginAnimation(TopProperty, CreateAnimation(double.IsNaN(Top) ? targetTop : Top, targetTop, durationMs, 0, ease));
+        BeginAnimation(HeightProperty, CreateAnimation(ActualHeight > 0 ? ActualHeight : Height, targetHeight, durationMs, heightDelayMs, ease));
+    }
+
+    private static DoubleAnimation CreateAnimation(double from, double to, int durationMs, int delayMs, IEasingFunction easing)
+    {
+        return new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(durationMs))
+        {
+            BeginTime = TimeSpan.FromMilliseconds(delayMs),
+            EasingFunction = easing,
+            FillBehavior = FillBehavior.HoldEnd
+        };
+    }
+
+    private static void AnimateOpacity(UIElement element, double to, int durationMs, int delayMs, bool hideOnComplete = false)
+    {
+        if (durationMs <= 0)
+        {
+            element.Opacity = to;
+            if (hideOnComplete && to <= 0)
+            {
+                element.Visibility = Visibility.Hidden;
+            }
+            return;
+        }
+
+        var animation = new DoubleAnimation(element.Opacity, to, TimeSpan.FromMilliseconds(durationMs))
+        {
+            BeginTime = TimeSpan.FromMilliseconds(delayMs),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        if (hideOnComplete)
+        {
+            animation.Completed += (_, _) =>
+            {
+                if (element.Opacity <= 0.01 || to <= 0)
+                {
+                    element.Visibility = Visibility.Hidden;
+                }
+            };
+        }
+        element.BeginAnimation(OpacityProperty, animation);
+    }
+
+    private void ConfigureContentMargins()
+    {
+        if (_settings.Style == IslandStyle.Notch)
+        {
+            CompactBar.Margin = new Thickness(66, 5, 66, 0);
+            ExpandedPanel.Margin = new Thickness(72, 72, 72, 20);
+        }
+        else
+        {
+            CompactBar.Margin = new Thickness(38, 16, 38, 0);
+            ExpandedPanel.Margin = new Thickness(40, 78, 40, 20);
+        }
+    }
+
+    private void UpdateGeometry()
+    {
+        if (ActualWidth <= 1 || ActualHeight <= 1)
+        {
+            return;
+        }
+
+        var geometry = IslandGeometryFactory.Create(
+            _settings.Style,
+            new Size(ActualWidth, ActualHeight),
+            _state == SurfaceState.Expanded);
+        SurfacePath.Data = geometry;
+        ContentHost.Clip = geometry;
+    }
+
+    private void StatsTimer_Tick(object? sender, EventArgs e) => UpdateLiveData();
+
+    private void UpdateLiveData()
+    {
+        var now = DateTime.Now;
+        ClockText.Text = now.ToString("HH:mm");
+        DateText.Text = now.ToString("M/d ddd");
+
+        var stats = _statsService.Sample();
+        CpuText.Text = $"{stats.CpuPercent:0}%";
+        RamText.Text = $"{stats.RamPercent:0}%";
+        NetworkText.Text = $"↓ {stats.DownloadMbps:0.0}  ↑ {stats.UploadMbps:0.0}";
+        ExpandedCpuText.Text = $"{stats.CpuPercent:0}%";
+        ExpandedRamText.Text = $"{stats.RamPercent:0}%";
+        ExpandedNetworkText.Text = $"↓ {stats.DownloadMbps:0.0} Mbps   ↑ {stats.UploadMbps:0.0} Mbps";
+
+        var uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
+        UptimeText.Text = uptime.TotalDays >= 1
+            ? $"Uptime {(int)uptime.TotalDays}d {uptime.Hours:00}:{uptime.Minutes:00}"
+            : $"Uptime {uptime.Hours:00}:{uptime.Minutes:00}";
+    }
+
+    private void ThemeTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_settings.Theme != AppThemeMode.System)
+        {
+            return;
+        }
+
+        var current = _themeService.IsSystemLightTheme();
+        if (current == _lastSystemLight)
+        {
+            return;
+        }
+
+        _lastSystemLight = current;
+        _themeService.Apply(AppThemeMode.System);
+    }
+
+    private void StyleToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.Style = _settings.Style == IslandStyle.DynamicIsland ? IslandStyle.Notch : IslandStyle.DynamicIsland;
+        SaveAndRefresh();
+    }
+
+    private void WidthPresetButton_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.WidthPreset = _settings.WidthPreset switch
+        {
+            WidthPreset.Authentic => WidthPreset.Compact,
+            WidthPreset.Compact => WidthPreset.Standard,
+            WidthPreset.Standard => WidthPreset.Wide,
+            WidthPreset.Wide => WidthPreset.FullWidth,
+            WidthPreset.FullWidth => WidthPreset.Custom,
+            _ => WidthPreset.Authentic
+        };
+        SaveAndRefresh();
+    }
+
+    private void ThemeButton_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.Theme = _settings.Theme switch
+        {
+            AppThemeMode.System => AppThemeMode.Dark,
+            AppThemeMode.Dark => AppThemeMode.Light,
+            _ => AppThemeMode.System
+        };
+        _themeService.Apply(_settings.Theme);
+        SaveAndRefresh();
+    }
+
+    private void CustomWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_initializing)
+        {
+            return;
+        }
+
+        _settings.CustomWidth = e.NewValue;
+        _settings.WidthPreset = WidthPreset.Custom;
+        SaveAndRefresh();
+    }
+
+    private void ExitButton_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
+
+    private void SaveAndRefresh()
+    {
+        _settingsStore.Save(_settings);
+        SyncSettingsUi();
+        ApplyState();
+    }
+
+    private void SyncSettingsUi()
+    {
+        StyleToggleButton.Content = _settings.Style == IslandStyle.DynamicIsland ? "Dynamic Island" : "Notch";
+        WidthPresetButton.Content = _settings.WidthPreset switch
+        {
+            WidthPreset.FullWidth => "Full width",
+            _ => _settings.WidthPreset.ToString()
+        };
+        ThemeButton.Content = $"Theme: {_settings.Theme}";
+        CustomWidthSlider.Maximum = Math.Max(220, SystemParameters.PrimaryScreenWidth - _settings.SideMargin * 2);
+        CustomWidthSlider.Value = Math.Clamp(_settings.CustomWidth, CustomWidthSlider.Minimum, CustomWidthSlider.Maximum);
+
+        var baseWidth = ResolveBaseSurfaceWidth(SystemParameters.PrimaryScreenWidth);
+        var authenticDensity = baseWidth < 360;
+        var compactDensity = baseWidth < 470;
+        var distributedDensity = baseWidth >= 980;
+        StatsCompact.Visibility = authenticDensity ? Visibility.Collapsed : Visibility.Visible;
+        DateText.Visibility = compactDensity ? Visibility.Collapsed : Visibility.Visible;
+
+        MediaColumn.Width = distributedDensity ? new GridLength(2.2, GridUnitType.Star) : new GridLength(1.35, GridUnitType.Star);
+        ClockColumn.Width = distributedDensity ? new GridLength(1.0, GridUnitType.Star) : GridLength.Auto;
+        StatsColumn.Width = distributedDensity ? new GridLength(1.1, GridUnitType.Star) : GridLength.Auto;
+        NetworkColumn.Width = distributedDensity ? new GridLength(1.2, GridUnitType.Star) : GridLength.Auto;
+        StatusColumn.Width = GridLength.Auto;
+        NetworkCompact.Visibility = distributedDensity || _state is SurfaceState.Peek or SurfaceState.Expanded
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+}

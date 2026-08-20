@@ -1,0 +1,19 @@
+# .NET / WPF
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+
+# Local review captures
+review-*.png
+
+# Build / publish output
+artifacts/
+publish/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

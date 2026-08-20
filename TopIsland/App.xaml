@@ -1,0 +1,53 @@
+<Application x:Class="TopIsland.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#F0101114"/>
+        <SolidColorBrush x:Key="SurfaceHoverBrush" Color="#F618191E"/>
+        <SolidColorBrush x:Key="CardBrush" Color="#96303238"/>
+        <SolidColorBrush x:Key="PrimaryTextBrush" Color="#FFF6F7F9"/>
+        <SolidColorBrush x:Key="SecondaryTextBrush" Color="#FFAAAEB8"/>
+        <SolidColorBrush x:Key="SurfaceBorderBrush" Color="#46FFFFFF"/>
+        <SolidColorBrush x:Key="DividerBrush" Color="#20FFFFFF"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#FF568DFF"/>
+        <SolidColorBrush x:Key="SuccessBrush" Color="#FF51C97A"/>
+
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Padding" Value="14"/>
+        </Style>
+
+        <Style x:Key="QuietButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#16FFFFFF"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="11"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#2AFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.78"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Application.Resources>
+</Application>
