@@ -14,8 +14,18 @@ A top-edge Windows information surface inspired by notch and Dynamic Island inte
 - Responsive information density for small widths
 - Distributed layout for wide/full-width modes
 - Live CPU, RAM, network throughput, clock, date, and uptime
+- Windows Global Media Transport integration
+  - title / artist / source app
+  - artwork
+  - playback progress
+  - previous / play-pause / next
+  - filters non-media sessions such as launcher noise
+- Active-window fallback when there is no useful media session
+- Artwork caching so unchanged thumbnails are not decoded every refresh
 - Persistent settings in `%AppData%\TopIsland\settings.json`
-- Auto-collapse after leaving an expanded surface
+- Expanded surface auto-collapse after leaving it
+- Transparent/shadow margins are click-through at the Win32 hit-test layer
+- The overlay is non-activating, so clicking it does not steal focus from the app underneath
 
 ## Development
 
@@ -27,13 +37,19 @@ Requirements:
 Build:
 
 ```powershell
-dotnet build .\TopIsland.slnx -c Debug
+dotnet build .\TopIsland.slnx -c Release
 ```
 
-Run:
+Run a debug build:
 
 ```powershell
-.\TopIsland\bin\Debug\net10.0-windows\TopIsland.exe
+.\TopIsland\bin\Debug\net10.0-windows10.0.19041.0\TopIsland.exe
+```
+
+Framework-dependent x64 publish:
+
+```powershell
+dotnet publish .\TopIsland\TopIsland.csproj -c Release -r win-x64 --self-contained false -o .\artifacts\publish
 ```
 
 ## Design rules
@@ -54,4 +70,4 @@ Hover widens this cutout. Click/expand widens it further before the surface grow
 
 ## Status
 
-Early interactive prototype. Media sessions, notifications, multi-monitor placement, richer system modules, and stronger native Windows backdrop integration are the next areas to iterate on.
+Interactive prototype under active iteration. Multi-monitor placement, stronger native Windows backdrop integration, richer modules, and packaging/startup UX are the next areas to refine.

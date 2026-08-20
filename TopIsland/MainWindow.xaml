@@ -46,8 +46,8 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="30" Height="30" CornerRadius="10" Background="#1EFFFFFF" Margin="0,0,9,0">
-                        <TextBlock Text="♪" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border x:Name="MediaArtworkBorder" Width="30" Height="30" CornerRadius="9" Background="#1EFFFFFF" Margin="0,0,9,0">
+                        <TextBlock x:Name="MediaGlyphText" Text="♪" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock x:Name="MediaTitleText" Text="TopIsland" FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="154"/>
@@ -90,16 +90,25 @@
 
                 <Border Grid.Column="0" Style="{StaticResource CardStyle}" Margin="0,0,8,0">
                     <StackPanel>
-                        <TextBlock Text="Now playing" FontSize="10.5" Foreground="{DynamicResource SecondaryTextBrush}"/>
-                        <TextBlock x:Name="ExpandedMediaTitle" Text="No media session yet" FontSize="15" FontWeight="SemiBold" Margin="0,6,0,2" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock x:Name="ExpandedMediaSubtitle" Text="Media integration comes next" FontSize="10.5" Foreground="{DynamicResource SecondaryTextBrush}"/>
-                        <Border Height="4" Background="#20FFFFFF" CornerRadius="2" Margin="0,15,0,12">
-                            <Border Width="84" HorizontalAlignment="Left" Background="{DynamicResource AccentBrush}" CornerRadius="2"/>
-                        </Border>
+                        <TextBlock x:Name="MediaSectionLabel" Text="Now playing" FontSize="10.5" Foreground="{DynamicResource SecondaryTextBrush}"/>
+                        <Grid Margin="0,7,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="ExpandedArtworkBorder" Width="50" Height="50" CornerRadius="12" Background="#1EFFFFFF" Margin="0,0,11,0">
+                                <TextBlock x:Name="ExpandedArtworkGlyph" Text="♪" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock x:Name="ExpandedMediaTitle" Text="No media session yet" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="ExpandedMediaSubtitle" Text="Media integration comes next" FontSize="10.5" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Grid>
+                        <ProgressBar x:Name="MediaProgressBar" Style="{StaticResource MediaProgressStyle}" Minimum="0" Maximum="1" Value="0" Margin="0,12,0,12" IsHitTestVisible="False"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button Style="{StaticResource QuietButtonStyle}" Content="◀" Margin="0,0,6,0" IsEnabled="False"/>
-                            <Button Style="{StaticResource QuietButtonStyle}" Content="▶" Margin="0,0,6,0" IsEnabled="False"/>
-                            <Button Style="{StaticResource QuietButtonStyle}" Content="▶▶" IsEnabled="False"/>
+                            <Button x:Name="PreviousMediaButton" Style="{StaticResource QuietButtonStyle}" Content="◀" Margin="0,0,6,0" IsEnabled="False" Click="PreviousMediaButton_Click"/>
+                            <Button x:Name="PlayPauseMediaButton" Style="{StaticResource QuietButtonStyle}" Content="▶" Margin="0,0,6,0" IsEnabled="False" Click="PlayPauseMediaButton_Click"/>
+                            <Button x:Name="NextMediaButton" Style="{StaticResource QuietButtonStyle}" Content="▶▶" IsEnabled="False" Click="NextMediaButton_Click"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>

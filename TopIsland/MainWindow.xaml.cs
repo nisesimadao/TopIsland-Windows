@@ -1,8 +1,12 @@
+using System.IO;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using TopIsland.Controls;
+using TopIsland.Interop;
 using TopIsland.Models;
 using TopIsland.Services;
 
@@ -21,7 +25,10 @@ public partial class MainWindow : Window
     private readonly SettingsStore _settingsStore = new();
     private readonly ThemeService _themeService = new();
     private readonly SystemStatsService _statsService = new();
+    private readonly MediaSessionService _mediaService = new();
+    private readonly ForegroundAppService _foregroundAppService = new();
     private readonly DispatcherTimer _statsTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _mediaTimer = new() { Interval = TimeSpan.FromMilliseconds(850) };
     private readonly DispatcherTimer _themeTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _peekTimer = new();
     private readonly DispatcherTimer _collapseTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
@@ -30,6 +37,8 @@ public partial class MainWindow : Window
     private SurfaceState _state = SurfaceState.Idle;
     private bool _lastSystemLight;
     private bool _initializing = true;
+    private OverlayWindowBehavior? _overlayBehavior;
+    private byte[]? _lastArtworkBytes;
 
     public MainWindow()
     {
@@ -40,12 +49,21 @@ public partial class MainWindow : Window
         _peekTimer.Tick += PeekTimer_Tick;
         _collapseTimer.Tick += CollapseTimer_Tick;
         _statsTimer.Tick += StatsTimer_Tick;
+        _mediaTimer.Tick += MediaTimer_Tick;
         _themeTimer.Tick += ThemeTimer_Tick;
         SizeChanged += (_, _) => UpdateGeometry();
+        SourceInitialized += MainWindow_SourceInitialized;
+        Closed += (_, _) => _overlayBehavior?.Detach();
         Loaded += MainWindow_Loaded;
     }
 
-    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    private void MainWindow_SourceInitialized(object? sender, EventArgs e)
+    {
+        _overlayBehavior = new OverlayWindowBehavior(this, point => SurfacePath.Data?.FillContains(point) == true);
+        _overlayBehavior.Attach();
+    }
+
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         _themeService.Apply(_settings.Theme);
         _lastSystemLight = _themeService.IsSystemLightTheme();
@@ -54,9 +72,12 @@ public partial class MainWindow : Window
         _state = _settings.StartExpanded ? SurfaceState.Expanded : SurfaceState.Idle;
         ApplyState(immediate: true);
         UpdateLiveData();
-
         _statsTimer.Start();
         _themeTimer.Start();
+
+        await _mediaService.InitializeAsync();
+        await RefreshMediaAsync();
+        _mediaTimer.Start();
         _initializing = false;
     }
 
@@ -173,7 +194,7 @@ public partial class MainWindow : Window
                 break;
             case SurfaceState.Expanded:
                 surfaceWidth = Math.Min(Math.Max(baseWidth * 1.38, 820), screenWidth - _settings.SideMargin * 2);
-                windowHeight = 304;
+                windowHeight = 324;
                 break;
             default:
                 surfaceWidth = baseWidth;
@@ -302,6 +323,105 @@ public partial class MainWindow : Window
     }
 
     private void StatsTimer_Tick(object? sender, EventArgs e) => UpdateLiveData();
+
+    private async void MediaTimer_Tick(object? sender, EventArgs e) => await RefreshMediaAsync();
+
+    private async Task RefreshMediaAsync()
+    {
+        var media = await _mediaService.SampleAsync();
+        if (media.HasSession)
+        {
+            MediaGlyphText.Text = "♪";
+            ExpandedArtworkGlyph.Text = "♪";
+            MediaSectionLabel.Text = "Now playing";
+            MediaTitleText.Text = media.Title;
+            MediaSubtitleText.Text = media.Subtitle;
+            ExpandedMediaTitle.Text = media.Title;
+            ExpandedMediaSubtitle.Text = string.IsNullOrWhiteSpace(media.SourceApp)
+                ? media.Subtitle
+                : $"{media.Subtitle} · {media.SourceApp}";
+        }
+        else
+        {
+            var foreground = _foregroundAppService.Sample();
+            MediaGlyphText.Text = "▣";
+            ExpandedArtworkGlyph.Text = "▣";
+            MediaSectionLabel.Text = "Active app";
+            MediaTitleText.Text = foreground.Title;
+            MediaSubtitleText.Text = foreground.ProcessName;
+            ExpandedMediaTitle.Text = foreground.Title;
+            ExpandedMediaSubtitle.Text = $"Active window · {foreground.ProcessName}";
+        }
+
+        ApplyArtwork(media.Artwork);
+        MediaProgressBar.Value = media.Progress;
+        PreviousMediaButton.IsEnabled = media.HasSession;
+        PlayPauseMediaButton.IsEnabled = media.HasSession;
+        NextMediaButton.IsEnabled = media.HasSession;
+        PlayPauseMediaButton.Content = media.IsPlaying ? "Ⅱ" : "▶";
+    }
+
+
+    private void ApplyArtwork(byte[]? bytes)
+    {
+        if (ReferenceEquals(_lastArtworkBytes, bytes))
+        {
+            return;
+        }
+
+        _lastArtworkBytes = bytes;
+        if (bytes is { Length: > 0 })
+        {
+            try
+            {
+                using var stream = new MemoryStream(bytes);
+                var image = new BitmapImage();
+                image.BeginInit();
+                image.CacheOption = BitmapCacheOption.OnLoad;
+                image.StreamSource = stream;
+                image.EndInit();
+                image.Freeze();
+
+                var compactBrush = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
+                var expandedBrush = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
+                MediaArtworkBorder.Background = compactBrush;
+                ExpandedArtworkBorder.Background = expandedBrush;
+                MediaGlyphText.Visibility = Visibility.Collapsed;
+                ExpandedArtworkGlyph.Visibility = Visibility.Collapsed;
+                return;
+            }
+            catch
+            {
+                // Fall through to the lightweight glyph placeholder.
+            }
+        }
+
+        var fallback = new SolidColorBrush(Color.FromArgb(30, 255, 255, 255));
+        fallback.Freeze();
+        MediaArtworkBorder.Background = fallback;
+        ExpandedArtworkBorder.Background = fallback;
+        MediaGlyphText.Visibility = Visibility.Visible;
+        ExpandedArtworkGlyph.Visibility = Visibility.Visible;
+    }
+
+    private async void PreviousMediaButton_Click(object sender, RoutedEventArgs e)
+    {
+        await _mediaService.PreviousAsync();
+        await RefreshMediaAsync();
+    }
+
+    private async void PlayPauseMediaButton_Click(object sender, RoutedEventArgs e)
+    {
+        await _mediaService.TogglePlayPauseAsync();
+        await RefreshMediaAsync();
+    }
+
+    private async void NextMediaButton_Click(object sender, RoutedEventArgs e)
+    {
+        await _mediaService.NextAsync();
+        await RefreshMediaAsync();
+    }
+
 
     private void UpdateLiveData()
     {

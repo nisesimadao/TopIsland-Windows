@@ -19,6 +19,21 @@
             <Setter Property="Padding" Value="14"/>
         </Style>
 
+        <Style x:Key="MediaProgressStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="4"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource DividerBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid x:Name="PART_Track" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                            <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="QuietButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#16FFFFFF"/>
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
