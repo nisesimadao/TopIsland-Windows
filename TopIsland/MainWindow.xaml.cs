@@ -39,7 +39,6 @@ public partial class MainWindow : Window
     private AppSettings _settings = new();
     private SurfaceState _state = SurfaceState.Idle;
     private bool _lastSystemLight;
-    private bool _initializing = true;
     private OverlayWindowBehavior? _overlayBehavior;
     private BackdropApplyResult _backdropResult = new(false, false, "Unavailable");
     private byte[]? _lastArtworkBytes;
@@ -83,12 +82,12 @@ public partial class MainWindow : Window
         await _mediaService.InitializeAsync();
         await RefreshMediaAsync();
         _mediaTimer.Start();
-        _initializing = false;
     }
 
     private void Root_MouseEnter(object sender, MouseEventArgs e)
     {
         _collapseTimer.Stop();
+        CompactBar.Visibility = _state == SurfaceState.Expanded ? Visibility.Hidden : Visibility.Visible;
         if (_state == SurfaceState.Expanded)
         {
             return;
@@ -107,6 +106,7 @@ public partial class MainWindow : Window
     private void Root_MouseLeave(object sender, MouseEventArgs e)
     {
         _peekTimer.Stop();
+        CompactBar.Visibility = _state == SurfaceState.Expanded ? Visibility.Hidden : Visibility.Visible;
         if (_state == SurfaceState.Expanded)
         {
             _collapseTimer.Stop();
@@ -155,11 +155,7 @@ public partial class MainWindow : Window
         var duration = immediate ? 0 : (_state == SurfaceState.Expanded ? 300 : 170);
         var heightDelay = !immediate && _settings.Style == IslandStyle.Notch && _state == SurfaceState.Expanded ? 40 : 0;
 
-        var baseWidthForState = ResolveBaseSurfaceWidth(SystemParameters.PrimaryScreenWidth);
-        NetworkCompact.Visibility = baseWidthForState >= 980 || _state is SurfaceState.Peek or SurfaceState.Expanded
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-
+        CompactBar.Visibility = _state == SurfaceState.Expanded ? Visibility.Hidden : Visibility.Visible;
         if (_state == SurfaceState.Expanded)
         {
             ExpandedPanel.Visibility = Visibility.Visible;
@@ -172,8 +168,9 @@ public partial class MainWindow : Window
 
         SurfacePath.SetResourceReference(System.Windows.Shapes.Path.FillProperty,
             _state is SurfaceState.Hover or SurfaceState.Peek ? "SurfaceHoverBrush" : "SurfaceBrush");
-        var nativeBackdrop = _backdropResult.NativeApplied && _settings.Material != SurfaceMaterial.Solid;
-        AnimateShadow(_state == SurfaceState.Idle ? 22 : 30, nativeBackdrop ? 0 : (_state == SurfaceState.Idle ? 0.28 : 0.42), immediate);
+        var idleShadow = _settings.Style == IslandStyle.Notch ? 0.0 : 0.22;
+        var shadowOpacity = _state == SurfaceState.Idle ? idleShadow : 0.42;
+        AnimateShadow(_state == SurfaceState.Idle ? 10 : 14, shadowOpacity, immediate);
 
         ConfigureContentMargins();
         AnimateWindow(target.Width, target.Height, target.Top, duration, heightDelay);
@@ -184,35 +181,38 @@ public partial class MainWindow : Window
     {
         var screenWidth = SystemParameters.PrimaryScreenWidth;
         var baseWidth = ResolveBaseSurfaceWidth(screenWidth);
+        var maxWidth = Math.Max(185, screenWidth - _settings.SideMargin * 2);
         double surfaceWidth;
         double windowHeight;
 
         switch (state)
         {
             case SurfaceState.Hover:
-                surfaceWidth = baseWidth * (_settings.Style == IslandStyle.Notch ? 1.13 : 1.055);
-                windowHeight = _settings.Style == IslandStyle.Notch ? 70 : 84;
+                surfaceWidth = baseWidth * 1.02;
+                windowHeight = _settings.Style == IslandStyle.Notch ? 54 : 70;
                 break;
             case SurfaceState.Peek:
-                surfaceWidth = baseWidth * (_settings.Style == IslandStyle.Notch ? 1.18 : 1.11);
-                windowHeight = _settings.Style == IslandStyle.Notch ? 76 : 90;
+                surfaceWidth = baseWidth * 1.04;
+                windowHeight = _settings.Style == IslandStyle.Notch ? 58 : 72;
                 break;
             case SurfaceState.Expanded:
-                surfaceWidth = Math.Min(Math.Max(baseWidth * 1.38, 820), screenWidth - _settings.SideMargin * 2);
-                windowHeight = 398;
+                surfaceWidth = _settings.WidthPreset == WidthPreset.FullWidth
+                    ? maxWidth
+                    : Math.Min(Math.Max(baseWidth, 640), maxWidth);
+                windowHeight = _settings.Style == IslandStyle.Notch ? 176 : 192;
                 break;
             default:
                 surfaceWidth = baseWidth;
-                windowHeight = _settings.Style == IslandStyle.Notch ? 62 : 76;
+                windowHeight = _settings.Style == IslandStyle.Notch ? 52 : 68;
                 break;
         }
 
-        surfaceWidth = Math.Clamp(surfaceWidth, 220, Math.Max(220, screenWidth - _settings.SideMargin * 2));
+        var minWidth = _settings.Style == IslandStyle.Notch ? 185 : 220;
+        surfaceWidth = Math.Clamp(surfaceWidth, minWidth, maxWidth);
         var windowWidth = surfaceWidth + IslandGeometryFactory.ShadowPadding * 2;
         var top = _settings.Style == IslandStyle.Notch ? 0 : state switch
         {
-            SurfaceState.Hover => 10,
-            SurfaceState.Peek => 11,
+            SurfaceState.Hover or SurfaceState.Peek => 10,
             _ => 8
         };
         return (windowWidth, windowHeight, top);
@@ -222,8 +222,8 @@ public partial class MainWindow : Window
     {
         return _settings.WidthPreset switch
         {
-            WidthPreset.Authentic => 300,
-            WidthPreset.Compact => 390,
+            WidthPreset.Authentic => _settings.Style == IslandStyle.Notch ? 185 : 260,
+            WidthPreset.Compact => 320,
             WidthPreset.Standard => 560,
             WidthPreset.Wide => screenWidth * 0.64,
             WidthPreset.FullWidth => screenWidth - _settings.SideMargin * 2,
@@ -327,13 +327,13 @@ public partial class MainWindow : Window
     {
         if (_settings.Style == IslandStyle.Notch)
         {
-            CompactBar.Margin = new Thickness(66, 5, 66, 0);
-            ExpandedPanel.Margin = new Thickness(72, 72, 72, 20);
+            CompactBar.Margin = new Thickness(30, 2, 30, 0);
+            ExpandedPanel.Margin = new Thickness(47, 20, 47, 20);
         }
         else
         {
-            CompactBar.Margin = new Thickness(38, 16, 38, 0);
-            ExpandedPanel.Margin = new Thickness(40, 78, 40, 20);
+            CompactBar.Margin = new Thickness(30, 18, 30, 0);
+            ExpandedPanel.Margin = new Thickness(36);
         }
     }
 
@@ -370,9 +370,6 @@ public partial class MainWindow : Window
         var media = await _mediaService.SampleAsync();
         if (media.HasSession)
         {
-            MediaGlyphText.Text = "♪";
-            ExpandedArtworkGlyph.Text = "♪";
-            MediaSectionLabel.Text = "Now playing";
             MediaTitleText.Text = media.Title;
             MediaSubtitleText.Text = media.Subtitle;
             ExpandedMediaTitle.Text = media.Title;
@@ -383,23 +380,21 @@ public partial class MainWindow : Window
         else
         {
             var foreground = _foregroundAppService.Sample();
-            MediaGlyphText.Text = "▣";
-            ExpandedArtworkGlyph.Text = "▣";
-            MediaSectionLabel.Text = "Active app";
             MediaTitleText.Text = foreground.Title;
             MediaSubtitleText.Text = foreground.ProcessName;
             ExpandedMediaTitle.Text = foreground.Title;
-            ExpandedMediaSubtitle.Text = $"Active window · {foreground.ProcessName}";
+            ExpandedMediaSubtitle.Text = foreground.ProcessName;
         }
 
         ApplyArtwork(media.Artwork);
         MediaProgressBar.Value = media.Progress;
+        MediaProgressBar.Opacity = media.HasSession ? 1 : 0;
         PreviousMediaButton.IsEnabled = media.HasSession;
         PlayPauseMediaButton.IsEnabled = media.HasSession;
         NextMediaButton.IsEnabled = media.HasSession;
-        PlayPauseMediaButton.Content = media.IsPlaying ? "Ⅱ" : "▶";
+        PlayIconViewbox.Visibility = media.IsPlaying ? Visibility.Collapsed : Visibility.Visible;
+        PauseIconViewbox.Visibility = media.IsPlaying ? Visibility.Visible : Visibility.Collapsed;
     }
-
 
     private void ApplyArtwork(byte[]? bytes)
     {
@@ -425,8 +420,8 @@ public partial class MainWindow : Window
                 var expandedBrush = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
                 MediaArtworkBorder.Background = compactBrush;
                 ExpandedArtworkBorder.Background = expandedBrush;
-                MediaGlyphText.Visibility = Visibility.Collapsed;
-                ExpandedArtworkGlyph.Visibility = Visibility.Collapsed;
+                MediaGlyphPath.Visibility = Visibility.Collapsed;
+                ExpandedArtworkGlyphPath.Visibility = Visibility.Collapsed;
                 return;
             }
             catch
@@ -439,8 +434,8 @@ public partial class MainWindow : Window
         fallback.Freeze();
         MediaArtworkBorder.Background = fallback;
         ExpandedArtworkBorder.Background = fallback;
-        MediaGlyphText.Visibility = Visibility.Visible;
-        ExpandedArtworkGlyph.Visibility = Visibility.Visible;
+        MediaGlyphPath.Visibility = Visibility.Visible;
+        ExpandedArtworkGlyphPath.Visibility = Visibility.Visible;
     }
 
     private async void PreviousMediaButton_Click(object sender, RoutedEventArgs e)
@@ -466,20 +461,13 @@ public partial class MainWindow : Window
     {
         var now = DateTime.Now;
         ClockText.Text = now.ToString("HH:mm");
-        DateText.Text = now.ToString("M/d ddd");
+        ExpandedClockText.Text = now.ToString("HH:mm");
+        ExpandedDateText.Text = now.ToString("M/d ddd");
 
         var stats = _statsService.Sample();
-        CpuText.Text = $"{stats.CpuPercent:0}%";
-        RamText.Text = $"{stats.RamPercent:0}%";
-        NetworkText.Text = $"↓ {stats.DownloadMbps:0.0}  ↑ {stats.UploadMbps:0.0}";
-        ExpandedCpuText.Text = $"{stats.CpuPercent:0}%";
-        ExpandedRamText.Text = $"{stats.RamPercent:0}%";
-        ExpandedNetworkText.Text = $"↓ {stats.DownloadMbps:0.0} Mbps   ↑ {stats.UploadMbps:0.0} Mbps";
-
-        var uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
-        UptimeText.Text = uptime.TotalDays >= 1
-            ? $"Uptime {(int)uptime.TotalDays}d {uptime.Hours:00}:{uptime.Minutes:00}"
-            : $"Uptime {uptime.Hours:00}:{uptime.Minutes:00}";
+        CompactStatsText.Text = $"CPU {stats.CpuPercent:0}  ·  RAM {stats.RamPercent:0}";
+        ExpandedSystemText.Text = $"CPU {stats.CpuPercent:0}%   RAM {stats.RamPercent:0}%";
+        ExpandedNetworkText.Text = $"↓ {stats.DownloadMbps:0.0}   ↑ {stats.UploadMbps:0.0} Mbps";
     }
 
     private void ThemeTimer_Tick(object? sender, EventArgs e)
@@ -500,63 +488,56 @@ public partial class MainWindow : Window
         ApplyBackdropMaterial();
     }
 
-    private void StyleToggleButton_Click(object sender, RoutedEventArgs e)
-    {
-        _settings.Style = _settings.Style == IslandStyle.DynamicIsland ? IslandStyle.Notch : IslandStyle.DynamicIsland;
-        SaveAndRefresh();
-    }
+    private void SetDynamicIsland_Click(object sender, RoutedEventArgs e) => SetStyle(IslandStyle.DynamicIsland);
+    private void SetNotch_Click(object sender, RoutedEventArgs e) => SetStyle(IslandStyle.Notch);
 
-    private void MaterialButton_Click(object sender, RoutedEventArgs e)
-    {
-        _settings.Material = _settings.Material switch
-        {
-            SurfaceMaterial.Solid => SurfaceMaterial.Mica,
-            SurfaceMaterial.Mica => SurfaceMaterial.Acrylic,
-            SurfaceMaterial.Acrylic => SurfaceMaterial.AppleGlass,
-            SurfaceMaterial.AppleGlass => SurfaceMaterial.MaterialCopy,
-            _ => SurfaceMaterial.Solid
-        };
+    private void SetAuthenticWidth_Click(object sender, RoutedEventArgs e) => SetWidth(WidthPreset.Authentic);
+    private void SetCompactWidth_Click(object sender, RoutedEventArgs e) => SetWidth(WidthPreset.Compact);
+    private void SetStandardWidth_Click(object sender, RoutedEventArgs e) => SetWidth(WidthPreset.Standard);
+    private void SetWideWidth_Click(object sender, RoutedEventArgs e) => SetWidth(WidthPreset.Wide);
+    private void SetFullWidth_Click(object sender, RoutedEventArgs e) => SetWidth(WidthPreset.FullWidth);
 
-        _themeService.Apply(_settings.Theme, _settings.Material);
-        ApplyBackdropMaterial();
-        SaveAndRefresh();
-    }
-    private void WidthPresetButton_Click(object sender, RoutedEventArgs e)
-    {
-        _settings.WidthPreset = _settings.WidthPreset switch
-        {
-            WidthPreset.Authentic => WidthPreset.Compact,
-            WidthPreset.Compact => WidthPreset.Standard,
-            WidthPreset.Standard => WidthPreset.Wide,
-            WidthPreset.Wide => WidthPreset.FullWidth,
-            WidthPreset.FullWidth => WidthPreset.Custom,
-            _ => WidthPreset.Authentic
-        };
-        SaveAndRefresh();
-    }
+    private void SetSolidMaterial_Click(object sender, RoutedEventArgs e) => SetMaterial(SurfaceMaterial.Solid);
+    private void SetMicaMaterial_Click(object sender, RoutedEventArgs e) => SetMaterial(SurfaceMaterial.Mica);
+    private void SetAcrylicMaterial_Click(object sender, RoutedEventArgs e) => SetMaterial(SurfaceMaterial.Acrylic);
+    private void SetGlassMaterial_Click(object sender, RoutedEventArgs e) => SetMaterial(SurfaceMaterial.Glass);
+    private void SetMaterialCopy_Click(object sender, RoutedEventArgs e) => SetMaterial(SurfaceMaterial.MaterialCopy);
 
-    private void ThemeButton_Click(object sender, RoutedEventArgs e)
-    {
-        _settings.Theme = _settings.Theme switch
-        {
-            AppThemeMode.System => AppThemeMode.Dark,
-            AppThemeMode.Dark => AppThemeMode.Light,
-            _ => AppThemeMode.System
-        };
-        _themeService.Apply(_settings.Theme, _settings.Material);
-        ApplyBackdropMaterial();
-        SaveAndRefresh();
-    }
+    private void SetSystemTheme_Click(object sender, RoutedEventArgs e) => SetTheme(AppThemeMode.System);
+    private void SetDarkTheme_Click(object sender, RoutedEventArgs e) => SetTheme(AppThemeMode.Dark);
+    private void SetLightTheme_Click(object sender, RoutedEventArgs e) => SetTheme(AppThemeMode.Light);
 
-    private void CustomWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    private void SetStyle(IslandStyle style)
     {
-        if (_initializing)
+        _settings.Style = style;
+        if (style == IslandStyle.Notch)
         {
-            return;
+            _settings.Material = SurfaceMaterial.Solid;
+            _themeService.Apply(_settings.Theme, _settings.Material);
+            ApplyBackdropMaterial();
         }
+        SaveAndRefresh();
+    }
 
-        _settings.CustomWidth = e.NewValue;
-        _settings.WidthPreset = WidthPreset.Custom;
+    private void SetWidth(WidthPreset width)
+    {
+        _settings.WidthPreset = width;
+        SaveAndRefresh();
+    }
+
+    private void SetMaterial(SurfaceMaterial material)
+    {
+        _settings.Material = material;
+        _themeService.Apply(_settings.Theme, _settings.Material);
+        ApplyBackdropMaterial();
+        SaveAndRefresh();
+    }
+
+    private void SetTheme(AppThemeMode theme)
+    {
+        _settings.Theme = theme;
+        _themeService.Apply(_settings.Theme, _settings.Material);
+        ApplyBackdropMaterial();
         SaveAndRefresh();
     }
 
@@ -571,63 +552,35 @@ public partial class MainWindow : Window
 
     private void SyncSettingsUi()
     {
-        StyleToggleButton.Content = _settings.Style == IslandStyle.DynamicIsland ? "Dynamic Island" : "Notch";
-        MaterialButton.Content = MaterialDisplayName(_settings.Material);
-        UpdateMaterialStatusText();
-        WidthPresetButton.Content = _settings.WidthPreset switch
-        {
-            WidthPreset.FullWidth => "Full width",
-            _ => _settings.WidthPreset.ToString()
-        };
-        ThemeButton.Content = $"Theme: {_settings.Theme}";
-        CustomWidthSlider.Maximum = Math.Max(220, SystemParameters.PrimaryScreenWidth - _settings.SideMargin * 2);
-        CustomWidthSlider.Value = Math.Clamp(_settings.CustomWidth, CustomWidthSlider.Minimum, CustomWidthSlider.Maximum);
+        DynamicIslandMenuItem.IsChecked = _settings.Style == IslandStyle.DynamicIsland;
+        NotchMenuItem.IsChecked = _settings.Style == IslandStyle.Notch;
+
+        AuthenticWidthMenuItem.IsChecked = _settings.WidthPreset == WidthPreset.Authentic;
+        CompactWidthMenuItem.IsChecked = _settings.WidthPreset == WidthPreset.Compact;
+        StandardWidthMenuItem.IsChecked = _settings.WidthPreset == WidthPreset.Standard;
+        WideWidthMenuItem.IsChecked = _settings.WidthPreset == WidthPreset.Wide;
+        FullWidthMenuItem.IsChecked = _settings.WidthPreset == WidthPreset.FullWidth;
+
+        SolidMaterialMenuItem.IsChecked = _settings.Material == SurfaceMaterial.Solid;
+        MicaMaterialMenuItem.IsChecked = _settings.Material == SurfaceMaterial.Mica;
+        AcrylicMaterialMenuItem.IsChecked = _settings.Material == SurfaceMaterial.Acrylic;
+        GlassMaterialMenuItem.IsChecked = _settings.Material == SurfaceMaterial.Glass;
+        MaterialCopyMenuItem.IsChecked = _settings.Material == SurfaceMaterial.MaterialCopy;
+
+        SystemThemeMenuItem.IsChecked = _settings.Theme == AppThemeMode.System;
+        DarkThemeMenuItem.IsChecked = _settings.Theme == AppThemeMode.Dark;
+        LightThemeMenuItem.IsChecked = _settings.Theme == AppThemeMode.Light;
 
         var baseWidth = ResolveBaseSurfaceWidth(SystemParameters.PrimaryScreenWidth);
-        var authenticDensity = baseWidth < 360;
-        var compactDensity = baseWidth < 470;
-        var distributedDensity = baseWidth >= 980;
-        StatsCompact.Visibility = authenticDensity ? Visibility.Collapsed : Visibility.Visible;
-        DateText.Visibility = compactDensity ? Visibility.Collapsed : Visibility.Visible;
-
-        MediaColumn.Width = distributedDensity ? new GridLength(2.2, GridUnitType.Star) : new GridLength(1.35, GridUnitType.Star);
-        ClockColumn.Width = distributedDensity ? new GridLength(1.0, GridUnitType.Star) : GridLength.Auto;
-        StatsColumn.Width = distributedDensity ? new GridLength(1.1, GridUnitType.Star) : GridLength.Auto;
-        NetworkColumn.Width = distributedDensity ? new GridLength(1.2, GridUnitType.Star) : GridLength.Auto;
-        StatusColumn.Width = GridLength.Auto;
-        NetworkCompact.Visibility = distributedDensity || _state is SurfaceState.Peek or SurfaceState.Expanded
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        CompactMediaText.Visibility = baseWidth >= 240 ? Visibility.Visible : Visibility.Collapsed;
+        MediaSubtitleText.Visibility = baseWidth >= 300 ? Visibility.Visible : Visibility.Collapsed;
+        CompactStatsText.Visibility = baseWidth >= 430 ? Visibility.Visible : Visibility.Collapsed;
     }
+
     private void ApplyBackdropMaterial()
     {
         _backdropResult = _backdropService.Apply(this, _settings.Material, _settings.Theme, _themeService);
         UpdateGeometry();
-        UpdateMaterialStatusText();
     }
 
-    private void UpdateMaterialStatusText()
-    {
-        if (!IsLoaded && PresentationSource.FromVisual(this) is null)
-        {
-            return;
-        }
-
-        if (_settings.Material == SurfaceMaterial.Solid)
-        {
-            MaterialNativeText.Text = "Native backdrop: off";
-            return;
-        }
-
-        MaterialNativeText.Text = _backdropResult.NativeApplied
-            ? $"Native: {_backdropResult.NativeKind} + TopIsland tint"
-            : $"Shape-safe: {MaterialDisplayName(_settings.Material)}";
-    }
-
-    private static string MaterialDisplayName(SurfaceMaterial material) => material switch
-    {
-        SurfaceMaterial.AppleGlass => "Apple Glass",
-        SurfaceMaterial.MaterialCopy => "Material Copy",
-        _ => material.ToString()
-    };
 }

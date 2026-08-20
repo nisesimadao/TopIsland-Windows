@@ -40,7 +40,7 @@ public sealed class BackdropMaterialService
         {
             SurfaceMaterial.Mica => DwmSystemBackdropType.MainWindow,
             SurfaceMaterial.Acrylic => DwmSystemBackdropType.TransientWindow,
-            SurfaceMaterial.AppleGlass => DwmSystemBackdropType.TransientWindow,
+            SurfaceMaterial.Glass => DwmSystemBackdropType.TransientWindow,
             SurfaceMaterial.MaterialCopy => DwmSystemBackdropType.TabbedWindow,
             _ => DwmSystemBackdropType.None
         };

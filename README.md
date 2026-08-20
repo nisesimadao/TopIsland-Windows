@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="TopIsland — A compact Windows top surface" width="100%">
+  <img src="assets/banner.svg" alt="TopIsland — A compact top surface for Windows" width="100%">
 </p>
 
 <p align="center">
@@ -10,71 +10,81 @@
   <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet&logoColor=white">
   <img alt="WPF" src="https://img.shields.io/badge/UI-WPF-0C54C2?style=flat-square">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%2B-0078D4?style=flat-square&logo=windows11&logoColor=white">
-  <img alt="Media controls" src="https://img.shields.io/badge/media-GMTC-568DFF?style=flat-square">
+  <img alt="Media controls" src="https://img.shields.io/badge/media-GMTC-333?style=flat-square">
 </p>
 
 # TopIsland
 
-TopIsland is a **top-center Windows overlay** that turns the empty space above your apps into a compact surface for media, system information, and quick controls.
+TopIsland is a **top-center Windows overlay** for media and lightweight system status. It can behave like a floating Dynamic Island or attach directly to the screen edge as a Notch.
 
-It can look like a floating Dynamic Island or a screen-attached Notch, including the concave / inverse-radius shoulders where the notch grows out of the top edge.
+The default design is deliberately simple: **one black surface, contextual information density, no dashboard of nested cards**.
 
 <p align="center">
-  <img src="docs/screenshots/dynamic-acrylic.png" alt="TopIsland expanded with the Acrylic material" width="100%">
+  <img src="docs/screenshots/notch-expanded.png" alt="TopIsland expanded Notch running over Minecraft" width="100%">
 </p>
 
-> The screenshot above is from the real WPF app running over Minecraft. It is cropped around the overlay so the UI is readable on GitHub.
+> Real runtime capture from the WPF app, cropped around TopIsland so the layout is readable on GitHub.
 
-## At a glance
+## What it does
 
-- **Dynamic Island + Notch** — switch live without restarting
-- **Inverse-radius notch shoulders** — not just a rounded rectangle attached to the top
-- **Idle → Hover → Peek → Expanded** interaction states
-- **Material selector** — Solid, Mica, Acrylic, Apple Glass, and Material Copy
-- **Live media** — title, artist/source, artwork, timeline, previous/play-pause/next through Windows GMTC
-- **Live system stats** — CPU, RAM, network, uptime, clock, and date
-- **Focus-safe overlay** — clicking TopIsland does not steal focus from the game/app underneath
-- **Shape-aware hit testing** — transparent padding is click-through
-- **Six width modes** — Authentic, Compact, Standard, Wide, Full Width, and Custom
-- **System / Light / Dark themes**
-- **Local settings** in `%APPDATA%\TopIsland\settings.json`
+- **Dynamic Island + Notch** modes
+- Small inverse-radius Notch shoulders instead of stretched Bezier wings
+- **Idle → Hover → Peek → Expanded** interaction
+- Windows GMTC media title, artist/source, artwork, progress, Previous / Play-Pause / Next
+- CPU, RAM, network, clock and date in larger presentations
+- Width presets: Authentic, Compact, Standard, Wide and Full Width
+- Information is removed as the surface gets smaller instead of shrinking everything
+- Transparent window areas remain click-through
+- Clicking the overlay does not steal focus from the app/game underneath
+- Right-click context menu for Style / Width / Material / Theme
+- Settings stored locally in `%APPDATA%\TopIsland\settings.json`
 
-## Surface materials
+## Design baseline
 
-TopIsland keeps its true pill/notch geometry first, then applies a material palette on top.
+TopIsland's layout is currently based on two references:
 
-| Material | Look |
-| --- | --- |
-| **Solid** | Opaque, highest contrast |
-| **Mica** | Calm, denser Windows-style base surface |
-| **Acrylic** | More translucent glass-like surface |
-| **Apple Glass** | Brighter layered glass with stronger highlights |
-| **Material Copy** | Windows accent-tinted adaptive surface |
+1. **BoringNotch** — its open/closed notch geometry, 90 px artwork, 30/40 px media controls, black single-surface layout and restrained hover treatment.
+2. **Apple's Dynamic Island / Live Activity guidance** — even margins, concentric placement, compact layouts and reducing content instead of squeezing it.
 
-Windows 11 exposes native DWM Mica / Desktop Acrylic system backdrops, but those backdrops paint the full rectangular WPF window bounds on the transparent layered host TopIsland needs for its custom shape. TopIsland therefore probes the native capability but currently uses its **shape-safe material renderer** instead of showing a rectangular gray backdrop around the island.
+The measured rules and review checklist are kept in [`docs/DESIGN-AUDIT.md`](docs/DESIGN-AUDIT.md).
+
+### Current geometry
+
+| State | Top inverse R | Bottom R |
+| --- | ---: | ---: |
+| Closed Notch | 6 | 14 |
+| Expanded Notch | 19 | 24 |
+
+Those radii are **independent of width**, so Full Width does not stretch the shoulder shape.
 
 ## Screenshots
 
 <table>
   <tr>
-    <td align="center"><b>Notch · Apple Glass</b></td>
-    <td align="center"><b>Compact · Mica</b></td>
+    <td align="center"><b>Dynamic Island · Expanded</b></td>
+    <td align="center"><b>Notch · Authentic</b></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/notch-apple-glass.png" alt="TopIsland Notch with Apple Glass material"></td>
-    <td><img src="docs/screenshots/compact-mica.png" alt="TopIsland compact Mica surface"></td>
+    <td><img src="docs/screenshots/dynamic-expanded.png" alt="TopIsland Dynamic Island expanded"></td>
+    <td><img src="docs/screenshots/notch-authentic.png" alt="TopIsland Authentic Notch"></td>
   </tr>
 </table>
 
-## Interaction
+## Density rules
 
-- Move the pointer onto the surface → it softly grows
-- Keep hovering → Peek state reveals more information
-- Click → Expanded dashboard
-- Move away from Expanded → it collapses after a short delay
-- Change Style / Material / Width / Theme directly from the expanded surface
+- **Authentic Notch:** artwork + time
+- **Compact:** add media title
+- **Standard:** add subtitle
+- **430 px and wider:** compact CPU/RAM can appear
+- **Expanded:** artwork + media controls + a single right-aligned status group
 
-The shadow blur/opacity are animated together with the geometry so Hover feels like the surface gains mass instead of just changing size.
+There is no permanent settings card inside the expanded surface. Configuration lives in the context menu instead.
+
+## Materials
+
+Black `Solid` is the default and the reference appearance for both styles. Optional Mica / Acrylic / Glass / Material Copy appearances are still available, but they are not used to imitate the physical Apple notch.
+
+Native Windows 11 DWM backdrops are probed, but on TopIsland's transparent shaped WPF host they paint the rectangular window bounds. The current renderer therefore keeps the custom shape intact instead of showing a rectangular backdrop around it.
 
 ## Build
 
@@ -87,26 +97,12 @@ Requirements:
 dotnet build TopIsland.slnx -c Release
 ```
 
-Publish a Windows x64 build:
+Publish Windows x64:
 
 ```powershell
 dotnet publish TopIsland/TopIsland.csproj -c Release -r win-x64 --self-contained false -o artifacts/publish
 ```
 
-## Project structure
+## Status
 
-```text
-TopIsland/
-  Controls/      custom Dynamic Island / inverse-radius Notch geometry
-  Interop/       overlay hit-testing and Windows backdrop interop
-  Models/        persisted surface settings
-  Services/      media, theme, stats, foreground-app and settings services
-  Assets/        application icon / logo
-
-docs/screenshots/  real runtime screenshots used by this README
-assets/            GitHub banner
-```
-
-## Current status
-
-TopIsland is an early interactive prototype, not a finished utility yet. The overlay, media integration, material switching, settings persistence, click-through behavior, focus preservation, and the main visual states are working. Multi-monitor / per-monitor DPI work and a compositor-backed true blur path are still being refined.
+TopIsland is still an interactive prototype. Media integration, geometry transitions, width presets, click-through behavior, focus preservation, material switching and settings persistence are working. Multi-monitor / per-monitor DPI and a compositor-backed shaped blur path are still in progress.

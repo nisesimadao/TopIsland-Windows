@@ -1,46 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="420" viewBox="0 0 1400 420" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="360" viewBox="0 0 1400 360" role="img" aria-labelledby="title desc">
   <title id="title">TopIsland</title>
-  <desc id="desc">A compact Windows top surface with Dynamic Island and Notch modes.</desc>
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#11141b"/>
-      <stop offset="0.55" stop-color="#171b24"/>
-      <stop offset="1" stop-color="#0f1117"/>
-    </linearGradient>
-    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity=".14"/>
-      <stop offset=".5" stop-color="#ffffff" stop-opacity=".04"/>
-      <stop offset="1" stop-color="#568dff" stop-opacity=".12"/>
-    </linearGradient>
-    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="16"/>
-    </filter>
-  </defs>
-  <rect width="1400" height="420" rx="40" fill="url(#bg)"/>
-  <circle cx="1230" cy="85" r="145" fill="#568dff" opacity=".07" filter="url(#glow)"/>
-  <circle cx="1110" cy="370" r="190" fill="#8d66ff" opacity=".045" filter="url(#glow)"/>
+  <desc id="desc">A compact top surface for Windows.</desc>
+  <rect width="1400" height="360" rx="36" fill="#111216"/>
 
-  <g transform="translate(82 73)">
-    <rect x="0" y="0" width="274" height="274" rx="70" fill="#1a1e27" stroke="#586072" stroke-width="2"/>
-    <rect x="38" y="91" width="198" height="82" rx="41" fill="#020308" stroke="#697286" stroke-width="2"/>
-    <ellipse cx="200" cy="132" rx="9" ry="9" fill="#5a9cff"/>
-    <circle cx="200" cy="132" r="26" fill="#568dff" opacity=".12" filter="url(#glow)"/>
-    <rect x="116" y="196" width="43" height="10" rx="5" fill="#568dff" opacity=".75"/>
+  <g transform="translate(92 78)">
+    <rect width="204" height="204" rx="52" fill="#1b1c21"/>
+    <rect x="30" y="73" width="144" height="58" rx="29" fill="#000"/>
+    <circle cx="148" cy="102" r="7" fill="#f5f5f7"/>
   </g>
 
-  <g transform="translate(414 82)" font-family="Segoe UI, Inter, Arial, sans-serif">
-    <text x="0" y="88" fill="#f7f8fb" font-size="68" font-weight="700" letter-spacing="-2">TopIsland</text>
-    <text x="2" y="134" fill="#aeb4c1" font-size="24">A compact, shape-first top surface for Windows.</text>
-    <g transform="translate(0 176)" font-size="17" font-weight="600">
-      <rect x="0" y="0" width="100" height="38" rx="19" fill="url(#glass)" stroke="#ffffff" stroke-opacity=".12"/>
-      <text x="50" y="25" text-anchor="middle" fill="#e9edf6">Mica</text>
-      <rect x="112" y="0" width="112" height="38" rx="19" fill="url(#glass)" stroke="#ffffff" stroke-opacity=".12"/>
-      <text x="168" y="25" text-anchor="middle" fill="#e9edf6">Acrylic</text>
-      <rect x="236" y="0" width="142" height="38" rx="19" fill="url(#glass)" stroke="#ffffff" stroke-opacity=".12"/>
-      <text x="307" y="25" text-anchor="middle" fill="#e9edf6">Apple Glass</text>
-      <rect x="390" y="0" width="156" height="38" rx="19" fill="url(#glass)" stroke="#ffffff" stroke-opacity=".12"/>
-      <text x="468" y="25" text-anchor="middle" fill="#e9edf6">Material Copy</text>
-    </g>
-    <text x="2" y="268" fill="#7f8796" font-size="18">Dynamic Island · inverse-radius Notch · media · system stats · focus-safe overlay</text>
+  <g transform="translate(358 89)" font-family="Segoe UI, Inter, Arial, sans-serif">
+    <text x="0" y="76" fill="#f5f5f7" font-size="68" font-weight="700" letter-spacing="-2">TopIsland</text>
+    <text x="2" y="121" fill="#a1a1a6" font-size="24">A compact top surface for Windows.</text>
+    <text x="2" y="178" fill="#f5f5f7" font-size="18" font-weight="600">Dynamic Island  ·  inverse-radius Notch  ·  media  ·  system status</text>
+    <text x="2" y="216" fill="#6e6e73" font-size="16">Black by default. One surface. Contextual density.</text>
   </g>
 </svg>

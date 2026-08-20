@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Media;
 using TopIsland.Models;
@@ -35,141 +35,64 @@ public sealed class ThemeService
         var light = ResolveLight(mode);
         var resources = Application.Current.Resources;
         var accent = ReadWindowsAccentColor() ?? Color.FromRgb(86, 141, 255);
+        var solidBlack = material == SurfaceMaterial.Solid;
 
-        resources["SurfaceBrush"] = CreateSurfaceBrush(light, material, hover: false, accent);
-        resources["SurfaceHoverBrush"] = CreateSurfaceBrush(light, material, hover: true, accent);
-        resources["CardBrush"] = CreateCardBrush(light, material, accent);
-        resources["PrimaryTextBrush"] = new SolidColorBrush(light ? Color.FromRgb(18, 20, 24) : Color.FromRgb(246, 247, 249));
-        resources["SecondaryTextBrush"] = new SolidColorBrush(light ? Color.FromRgb(88, 92, 101) : Color.FromRgb(170, 174, 184));
-        resources["SurfaceBorderBrush"] = new SolidColorBrush(GetBorderColor(light, material));
-        resources["DividerBrush"] = new SolidColorBrush(light
-            ? Color.FromArgb(38, 0, 0, 0)
-            : Color.FromArgb(34, 255, 255, 255));
-        resources["AccentBrush"] = new SolidColorBrush(accent);
-        resources["SuccessBrush"] = new SolidColorBrush(Color.FromRgb(81, 201, 122));
-        resources["ButtonBrush"] = new SolidColorBrush(light
-            ? Color.FromArgb(26, 0, 0, 0)
-            : Color.FromArgb(22, 255, 255, 255));
-        resources["ButtonHoverBrush"] = new SolidColorBrush(light
-            ? Color.FromArgb(42, 0, 0, 0)
-            : Color.FromArgb(42, 255, 255, 255));
-        resources["MaterialSheenBrush"] = CreateSheenBrush(light, material, accent);
+        resources["SurfaceBrush"] = new SolidColorBrush(GetSurfaceColor(light, material, hover: false, accent));
+        resources["SurfaceHoverBrush"] = new SolidColorBrush(GetSurfaceColor(light, material, hover: true, accent));
+        resources["PrimaryTextBrush"] = new SolidColorBrush(solidBlack || !light
+            ? Color.FromRgb(245, 245, 247)
+            : Color.FromRgb(24, 24, 27));
+        resources["SecondaryTextBrush"] = new SolidColorBrush(solidBlack || !light
+            ? Color.FromRgb(151, 151, 157)
+            : Color.FromRgb(99, 99, 102));
+        resources["TertiaryTextBrush"] = new SolidColorBrush(solidBlack || !light
+            ? Color.FromRgb(99, 99, 102)
+            : Color.FromRgb(142, 142, 147));
+        resources["SurfaceBorderBrush"] = new SolidColorBrush(solidBlack
+            ? Colors.Transparent
+            : Color.FromArgb(light ? (byte)38 : (byte)30, 255, 255, 255));
+        resources["DividerBrush"] = new SolidColorBrush(solidBlack || !light
+            ? Color.FromArgb(38, 255, 255, 255)
+            : Color.FromArgb(28, 0, 0, 0));
+        resources["ControlHoverBrush"] = new SolidColorBrush(solidBlack || !light
+            ? Color.FromArgb(36, 255, 255, 255)
+            : Color.FromArgb(24, 0, 0, 0));
+        resources["ControlPressedBrush"] = new SolidColorBrush(solidBlack || !light
+            ? Color.FromArgb(54, 255, 255, 255)
+            : Color.FromArgb(38, 0, 0, 0));
+        resources["AccentBrush"] = new SolidColorBrush(material == SurfaceMaterial.MaterialCopy ? accent : Color.FromRgb(245, 245, 247));
     }
 
-    private static Brush CreateSurfaceBrush(bool light, SurfaceMaterial material, bool hover, Color accent)
+    private static Color GetSurfaceColor(bool light, SurfaceMaterial material, bool hover, Color accent)
     {
         return material switch
         {
-            SurfaceMaterial.Mica => new SolidColorBrush(light
-                ? Color.FromArgb((byte)(hover ? 224 : 214), 245, 246, 248)
-                : Color.FromArgb((byte)(hover ? 226 : 214), 22, 23, 28)),
-            SurfaceMaterial.Acrylic => new SolidColorBrush(light
-                ? Color.FromArgb((byte)(hover ? 205 : 188), 250, 251, 253)
-                : Color.FromArgb((byte)(hover ? 208 : 188), 18, 19, 24)),
-            SurfaceMaterial.AppleGlass => CreateAppleGlass(light, hover),
-            SurfaceMaterial.MaterialCopy => CreateMaterialCopy(light, hover, accent),
-            _ => new SolidColorBrush(light
-                ? Color.FromArgb((byte)(hover ? 246 : 238), 247, 248, 250)
-                : Color.FromArgb((byte)(hover ? 246 : 240), 16, 17, 20))
-        };
-    }
-
-    private static Brush CreateCardBrush(bool light, SurfaceMaterial material, Color accent)
-    {
-        return material switch
-        {
-            SurfaceMaterial.Acrylic => new SolidColorBrush(light
-                ? Color.FromArgb(126, 255, 255, 255)
-                : Color.FromArgb(104, 52, 54, 62)),
-            SurfaceMaterial.AppleGlass => new LinearGradientBrush(
-                light
-                    ? Color.FromArgb(154, 255, 255, 255)
-                    : Color.FromArgb(88, 255, 255, 255),
-                light
-                    ? Color.FromArgb(104, 244, 246, 250)
-                    : Color.FromArgb(72, 30, 32, 39),
-                new Point(0, 0),
-                new Point(1, 1)),
-            SurfaceMaterial.MaterialCopy => new SolidColorBrush(MixWithAlpha(
-                light ? Color.FromRgb(248, 249, 252) : Color.FromRgb(30, 31, 37),
+            SurfaceMaterial.Solid => Color.FromArgb(255, 0, 0, 0),
+            SurfaceMaterial.Mica => light
+                ? Color.FromArgb((byte)(hover ? 246 : 240), 243, 243, 245)
+                : Color.FromArgb((byte)(hover ? 246 : 240), 30, 30, 32),
+            SurfaceMaterial.Acrylic => light
+                ? Color.FromArgb((byte)(hover ? 226 : 214), 246, 246, 248)
+                : Color.FromArgb((byte)(hover ? 226 : 214), 24, 24, 27),
+            SurfaceMaterial.Glass => light
+                ? Color.FromArgb((byte)(hover ? 202 : 188), 250, 250, 252)
+                : Color.FromArgb((byte)(hover ? 204 : 190), 18, 18, 20),
+            SurfaceMaterial.MaterialCopy => Tint(
+                light ? Color.FromRgb(244, 244, 246) : Color.FromRgb(24, 24, 27),
                 accent,
-                light ? 0.07 : 0.15,
-                light ? (byte)160 : (byte)132)),
-            SurfaceMaterial.Mica => new SolidColorBrush(light
-                ? Color.FromArgb(155, 255, 255, 255)
-                : Color.FromArgb(128, 43, 45, 52)),
-            _ => new SolidColorBrush(light
-                ? Color.FromArgb(180, 255, 255, 255)
-                : Color.FromArgb(150, 40, 42, 49))
+                light ? 0.08 : 0.13,
+                hover ? (byte)238 : (byte)228),
+            _ => Colors.Black
         };
     }
 
-    private static Brush CreateAppleGlass(bool light, bool hover)
+    private static Color Tint(Color baseColor, Color accent, double amount, byte alpha)
     {
-        var brush = new LinearGradientBrush
-        {
-            StartPoint = new Point(0, 0),
-            EndPoint = new Point(1, 1)
-        };
-        if (light)
-        {
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(hover ? 218 : 202), 255, 255, 255), 0));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(hover ? 188 : 170), 239, 243, 250), 0.52));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(hover ? 205 : 188), 255, 255, 255), 1));
-        }
-        else
-        {
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(hover ? 198 : 178), 32, 34, 42), 0));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(hover ? 176 : 156), 15, 16, 21), 0.55));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(hover ? 190 : 170), 37, 39, 47), 1));
-        }
-        return brush;
-    }
-
-    private static Brush CreateMaterialCopy(bool light, bool hover, Color accent)
-    {
-        var baseColor = light ? Color.FromRgb(247, 248, 251) : Color.FromRgb(24, 25, 30);
-        var tint = Mix(baseColor, accent, light ? 0.10 : 0.20);
-        var brush = new LinearGradientBrush
-        {
-            StartPoint = new Point(0, 0),
-            EndPoint = new Point(1, 0.8)
-        };
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(hover ? 222 : 204), tint.R, tint.G, tint.B), 0));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(hover ? 205 : 187), baseColor.R, baseColor.G, baseColor.B), 0.65));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(hover ? 212 : 194), tint.R, tint.G, tint.B), 1));
-        return brush;
-    }
-
-    private static Brush CreateSheenBrush(bool light, SurfaceMaterial material, Color accent)
-    {
-        if (material is SurfaceMaterial.Solid or SurfaceMaterial.Mica)
-        {
-            return Brushes.Transparent;
-        }
-
-        var brush = new LinearGradientBrush
-        {
-            StartPoint = new Point(0.05, 0),
-            EndPoint = new Point(0.95, 1)
-        };
-        var highlight = material == SurfaceMaterial.MaterialCopy ? accent : Colors.White;
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(light ? 38 : 28), highlight.R, highlight.G, highlight.B), 0));
-        brush.GradientStops.Add(new GradientStop(Colors.Transparent, 0.38));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(light ? 18 : 12), 255, 255, 255), 1));
-        return brush;
-    }
-
-    private static Color GetBorderColor(bool light, SurfaceMaterial material)
-    {
-        var alpha = material switch
-        {
-            SurfaceMaterial.AppleGlass => light ? 205 : 100,
-            SurfaceMaterial.Acrylic => light ? 175 : 82,
-            SurfaceMaterial.MaterialCopy => light ? 165 : 82,
-            _ => light ? 150 : 70
-        };
-        return Color.FromArgb((byte)alpha, 255, 255, 255);
+        return Color.FromArgb(
+            alpha,
+            (byte)Math.Round(baseColor.R + (accent.R - baseColor.R) * amount),
+            (byte)Math.Round(baseColor.G + (accent.G - baseColor.G) * amount),
+            (byte)Math.Round(baseColor.B + (accent.B - baseColor.B) * amount));
     }
 
     private static Color? ReadWindowsAccentColor()
@@ -186,21 +109,7 @@ public sealed class ThemeService
         catch
         {
         }
+
         return null;
-    }
-
-    private static Color Mix(Color a, Color b, double t)
-    {
-        t = Math.Clamp(t, 0, 1);
-        return Color.FromRgb(
-            (byte)Math.Round(a.R + (b.R - a.R) * t),
-            (byte)Math.Round(a.G + (b.G - a.G) * t),
-            (byte)Math.Round(a.B + (b.B - a.B) * t));
-    }
-
-    private static Color MixWithAlpha(Color a, Color b, double t, byte alpha)
-    {
-        var mixed = Mix(a, b, t);
-        return Color.FromArgb(alpha, mixed.R, mixed.G, mixed.B);
     }
 }

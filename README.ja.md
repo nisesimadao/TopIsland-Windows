@@ -10,70 +10,81 @@
   <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet&logoColor=white">
   <img alt="WPF" src="https://img.shields.io/badge/UI-WPF-0C54C2?style=flat-square">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%2B-0078D4?style=flat-square&logo=windows11&logoColor=white">
-  <img alt="Media controls" src="https://img.shields.io/badge/media-GMTC-568DFF?style=flat-square">
 </p>
 
 # TopIsland
 
-TopIslandは、Windowsの画面上部に常駐して、メディア・システム情報・簡単な操作をまとめる**トップセンター型オーバーレイ**です。
+TopIslandは、メディアと軽量なシステム情報を表示する**Windows上端の常駐オーバーレイ**です。浮いているDynamic Island風と、画面上端から直接生えるNotchを切り替えられます。
 
-浮いているDynamic Island風だけでなく、画面上端から直接生えるNotchにも切り替えられます。Notchの肩は単純な角丸ではなく、上端から凹方向へ滑らかにつながる逆R形状です。
+現在の基準デザインは、**黒い1枚の面・必要な情報だけ・入れ子カードを並べない**ことを優先しています。
 
 <p align="center">
-  <img src="docs/screenshots/dynamic-acrylic.png" alt="Acrylicマテリアルで展開したTopIsland" width="100%">
+  <img src="docs/screenshots/notch-expanded.png" alt="Minecraft上で動作するTopIslandのExpanded Notch" width="100%">
 </p>
 
-> 上の画像は実際のWPFアプリをMinecraft上で動かして撮影したものです。GitHubでUIが見やすいようにTopIsland周辺だけクロップしています。
+> 実際のWPFアプリを動かして撮影し、GitHubで読みやすいようTopIsland周辺だけクロップしています。
 
-## できること
+## 主な機能
 
-- **Dynamic Island / Notch** をその場で切り替え
-- **逆R付きNotch** — 上端から自然につながる凹形状
-- **Idle → Hover → Peek → Expanded** の状態遷移
-- **Material切替** — Solid / Mica / Acrylic / Apple Glass / Material Copy
-- Windows GMTCから曲名・アーティスト・アートワーク・進捗を取得
-- Previous / Play-Pause / Next のメディア操作
-- CPU / RAM / Network / Uptime / 時計 / 日付
-- TopIslandをクリックしても背後のゲームやアプリからフォーカスを奪わない
-- 透明部分はOSレベルでクリック透過
-- Authentic / Compact / Standard / Wide / Full Width / Custom の幅プリセット
-- System / Light / Dark テーマ
-- `%APPDATA%\TopIsland\settings.json` に設定保存
+- **Dynamic Island / Notch** 切替
+- 横幅に引き伸ばされない小さな逆R付きNotch
+- **Idle → Hover → Peek → Expanded**
+- Windows GMTCから曲名・artist/source・アートワーク・進捗を取得
+- Previous / Play-Pause / Next
+- 大きい表示ではCPU / RAM / Network / 時刻 / 日付
+- Authentic / Compact / Standard / Wide / Full Width
+- 狭い幅では文字を縮小せず、優先度の低い情報を消す
+- 透明部分はクリック透過
+- TopIslandを操作しても背後のアプリやゲームからフォーカスを奪わない
+- Style / Width / Material / Themeは右クリックメニューから変更
+- `%APPDATA%\TopIsland\settings.json` にローカル保存
 
-## Material
+## デザイン基準
 
-| Material | 見た目 |
-| --- | --- |
-| **Solid** | 一番コントラストが高い不透明サーフェス |
-| **Mica** | 落ち着いた密度のWindows寄りサーフェス |
-| **Acrylic** | より透け感の強いガラス寄りサーフェス |
-| **Apple Glass** | ハイライトを強めた明るいガラス表現 |
-| **Material Copy** | Windowsのアクセントカラーを薄く取り込む適応型サーフェス |
+現在は主に次の2つを参照しています。
 
-Windows 11にはDWMのNative Mica / Desktop Acrylicがありますが、TopIslandで必要な透明WPFホストにそのまま適用すると、Islandの外側にある影用の矩形領域まで灰色に描画されます。現在は形状を優先して、Native APIの対応可否を確認しつつ、実表示には**TopIsland側のshape-safe renderer**を使っています。
+1. **BoringNotch** — 開閉時のNotch形状、90pxアート、30/40pxのメディア操作、黒い単一サーフェス、控えめなHover。
+2. **AppleのDynamic Island / Live Activityガイド** — 均一なマージン、外形と同心円の配置、コンパクトな情報設計、詰め込まず情報を減らす考え方。
+
+調査した数値とレビュー基準は [`docs/DESIGN-AUDIT.md`](docs/DESIGN-AUDIT.md) に固定しています。
+
+### 現在のNotch形状
+
+| 状態 | 上部の逆R | 下部R |
+| --- | ---: | ---: |
+| Closed | 6 | 14 |
+| Expanded | 19 | 24 |
+
+半径は横幅と独立しているため、Full Widthにしても肩だけ横に引き伸ばされません。
 
 ## Screenshots
 
 <table>
   <tr>
-    <td align="center"><b>Notch · Apple Glass</b></td>
-    <td align="center"><b>Compact · Mica</b></td>
+    <td align="center"><b>Dynamic Island · Expanded</b></td>
+    <td align="center"><b>Notch · Authentic</b></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/notch-apple-glass.png" alt="Apple GlassのNotch"></td>
-    <td><img src="docs/screenshots/compact-mica.png" alt="MicaのCompact表示"></td>
+    <td><img src="docs/screenshots/dynamic-expanded.png" alt="Expanded Dynamic Island"></td>
+    <td><img src="docs/screenshots/notch-authentic.png" alt="Authentic Notch"></td>
   </tr>
 </table>
 
-## 操作
+## 情報密度
 
-- マウスを乗せる → 少し広がる
-- そのままHover → Peekへ移行
-- クリック → Expanded
-- Expandedからマウスを外す → 少し待って収納
-- Expanded内からStyle / Material / Width / Themeを変更
+- **Authentic Notch:** アート＋時刻
+- **Compact:** 曲名を追加
+- **Standard:** artist/sourceを追加
+- **430px以上:** Compact状態にCPU/RAMを追加可能
+- **Expanded:** アート＋メディア操作＋右端の1つのステータスグループ
 
-Hoverではサイズだけでなく影のBlur/Opacityも補間して、ただ拡大するのではなく少し「質量が出る」ようにしています。
+Expandedの中に設定カードは置きません。設定は右クリックメニューへ分離しています。
+
+## Material
+
+標準は黒い `Solid` です。Mica / Acrylic / Glass / Material Copyはオプションとして残していますが、Appleの物理Notchをガラスモーフィズムとして再現するものではありません。
+
+Windows 11のNative DWM backdropも検出しますが、透明WPFホストではカスタム形状の外側まで矩形で描画されるため、現在は形状を優先したレンダリングを使用しています。
 
 ## Build
 
@@ -94,4 +105,4 @@ dotnet publish TopIsland/TopIsland.csproj -c Release -r win-x64 --self-contained
 
 ## 現在の状態
 
-まだ完成版ではなく、動くインタラクティブプロトタイプです。オーバーレイ本体、メディア連携、Material切替、設定保存、クリック透過、フォーカス維持、主要アニメーションは動作しています。今後はマルチモニター / Per-Monitor DPIと、矩形を出さずに使えるCompositionベースの本物のBlur経路を詰める予定です。
+まだ完成版ではなくインタラクティブプロトタイプです。メディア連携、形状アニメーション、幅プリセット、クリック透過、フォーカス維持、Material切替、設定保存は動作しています。マルチモニター / Per-Monitor DPIと、形状を維持したCompositionベースのBlurは今後の改善対象です。
