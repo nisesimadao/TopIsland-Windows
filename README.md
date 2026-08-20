@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="TopIsland — A compact top surface for Windows" width="100%">
+  <img src="assets/banner.svg" alt="TopIsland" width="100%">
 </p>
 
 <p align="center">
@@ -10,77 +10,45 @@
   <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet&logoColor=white">
   <img alt="WPF" src="https://img.shields.io/badge/UI-WPF-0C54C2?style=flat-square">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%2B-0078D4?style=flat-square&logo=windows11&logoColor=white">
-  <img alt="Media controls" src="https://img.shields.io/badge/media-GMTC-333?style=flat-square">
 </p>
 
 # TopIsland
 
-TopIsland is a **top-center Windows overlay** for media, the active app, and lightweight system status. It can float as a Dynamic Island or attach directly to the top edge as a Notch.
+TopIsland is a top-center Windows surface that stays small until you need more information. It can float as a **Dynamic Island** or attach to the top edge as an inverse-radius **Notch**.
 
-The reference appearance is deliberately simple: **one black surface, contextual information density, no dashboard of nested cards**.
+The reference appearance is intentionally restrained: **one black surface, real data, contextual density, and no nested dashboard of rounded cards**.
 
 <p align="center">
-  <img src="docs/screenshots/notch-expanded.png" alt="TopIsland expanded Notch running on Windows" width="100%">
+  <img src="docs/screenshots/notch-expanded.png" alt="TopIsland expanded Notch with live Windows information" width="100%">
 </p>
 
-> Real runtime capture from the WPF app, cropped around TopIsland so the layout is readable on GitHub.
+> Real runtime capture from the WPF app. The screenshot is cropped to the rendered surface so the layout remains readable on GitHub.
 
-## What it does
+## Live information
 
-- **Dynamic Island + Notch** modes
-- Small inverse-radius Notch shoulders instead of stretched Bezier wings
-- **Idle → Hover → Peek → Expanded** interaction
-- Windows GMTC media title, artist/source, artwork, progress and media controls
-- When no media is active, shows the **foreground app title, process and application icon** instead of fake media controls
-- CPU, RAM, network, clock and date in larger presentations
-- Width presets: Authentic, Compact, Standard, Wide and Full Width
-- Information is removed as the surface gets smaller instead of shrinking everything
-- Transparent window areas remain click-through
-- Clicking TopIsland does not steal focus from the app/game underneath
-- System / Light / Dark theme modes
+TopIsland currently uses real Windows/application data for:
 
-## System tray
+- Windows GMTC media title, source, artwork, playback position and Previous / Play-Pause / Next
+- Foreground application title, process and executable icon when there is no active media session
+- **CPU / GPU / RAM** usage
+- Network download/upload throughput
+- System-drive free/total storage
+- Active browser/download-manager partial downloads, including current bytes and measured transfer speed when available
+- Built-in **Focus timer** with 25/45-minute presets, pause/resume and reset
+- Windows notifications: count, source app and latest text when notification-listener access is allowed
+- Battery level/charging state on devices that actually have a battery
+- Clock and date
 
-TopIsland lives in the Windows notification area as well as on-screen. Right-clicking the tray icon exposes the settings without turning the overlay itself into a settings dashboard:
+Notification permission is never requested automatically. If access is not already allowed, the notification lane stays hidden and the tray can expose **Enable notifications**.
 
-- Show / Hide
-- Expand
-- Style: Dynamic Island / Notch
-- Width presets
-- Material and theme
-- Display selection
-- Launch at startup
-- Quit
+## Interaction states
 
-The tray actions use the same persisted settings as the overlay.
+- **Idle** — minimum information for the selected width
+- **Hover** — subtly wider/deeper
+- **Peek** — reveals selected lower-priority information without opening the full surface
+- **Expanded** — media/context row plus one lower information lane separated only by hairline dividers
 
-## Multiple displays and DPI
-
-Display mode can be changed from the tray:
-
-- **Follow active app** — TopIsland follows the monitor containing the foreground window
-- **Primary display**
-- **Fixed display** — choose a specific connected monitor
-
-The overlay runs as **PerMonitorV2** and resolves each monitor's physical mode and Windows scale factor independently. Full Width and Standard sizing were verified on a 150% primary display and a 125% secondary display.
-
-## Design baseline
-
-TopIsland's layout is currently based on two references:
-
-1. **BoringNotch** — open/closed Notch geometry, 90 px artwork, restrained controls, a black single-surface layout and subtle hover treatment.
-2. **Apple's Dynamic Island / Live Activity guidance** — even margins, concentric placement, compact layouts and reducing content instead of squeezing it.
-
-Measured rules and the review checklist live in [`docs/DESIGN-AUDIT.md`](docs/DESIGN-AUDIT.md).
-
-### Current Notch geometry
-
-| State | Top inverse R | Bottom R |
-| --- | ---: | ---: |
-| Closed | 6 | 14 |
-| Expanded | 19 | 24 |
-
-The radii are **independent of width**, so Full Width does not stretch the shoulder shape.
+Smaller widths remove information instead of shrinking every label. Full Width is allowed to reveal extra network/storage/activity status, but the media content itself still has a readable maximum width.
 
 ## Screenshots
 
@@ -95,21 +63,64 @@ The radii are **independent of width**, so Full Width does not stretch the shoul
   </tr>
 </table>
 
-## Density rules
+## System tray
 
-- **Authentic Notch:** artwork/app icon + time
-- **Compact:** add the primary title
-- **Standard:** add subtitle/source when space allows
-- **Peek:** may reveal one lower-priority detail without shrinking the existing layout
-- **Expanded:** artwork/app icon + primary information + one right-aligned status group
+Right-click the TopIsland tray icon to configure the app without turning the overlay into a settings dashboard:
 
-There is no permanent settings card inside the expanded surface. Configuration belongs in the context menu and system tray.
+- Show / Hide
+- Expand
+- Dynamic Island / Notch
+- Width: Authentic / Compact / Standard / Wide / Full Width
+- Material and theme
+- Display: Follow active app / Primary / a fixed connected display
+- Focus timer: 25 min / 45 min / Pause-Resume / Reset
+- Enable notifications when Windows access is not already allowed
+- Launch at startup
+- Quit
+
+All persistent choices use the same `%APPDATA%\TopIsland\settings.json` model.
+
+## Multiple displays and DPI
+
+The WPF host is **PerMonitorV2**. TopIsland reads each monitor's physical display mode and Windows scale factor independently.
+
+Current display modes:
+
+- **Follow active app** — follow the monitor containing the foreground window
+- **Primary display**
+- **Fixed display** — pin TopIsland to a selected connected monitor
+
+A follow transition fades out briefly, moves/recalculates for the destination DPI, then fades back in instead of sliding through unrelated monitor coordinate spaces.
+
+The current development machine verifies a 3840×2160 display at 150% and a 2560×1440 display at 125%.
+
+## Design baseline
+
+TopIsland deliberately avoids the common glass-card dashboard look. The current visual audit is documented in [`docs/DESIGN-AUDIT.md`](docs/DESIGN-AUDIT.md).
+
+Key rules:
+
+- One primary surface
+- Black `Solid` is the reference appearance
+- 4 / 8 / 12 / 16 / 24 dip spacing scale
+- Symmetric edge clearances unless geometry requires otherwise
+- Vector icons, never emoji UI glyphs
+- Compact widths hide lower-priority data instead of compressing typography
+- Notch inverse radii stay independent of width
+- Wide shells do not stretch progress bars/media content merely to fill space
+
+The Notch geometry currently uses:
+
+| State | Inverse top radius | Bottom radius |
+| --- | ---: | ---: |
+| Closed | 6 | 14 |
+| Expanded | 19 | 24 |
 
 ## Materials
 
-Black `Solid` is the default and reference appearance. Optional Mica / Acrylic / Glass / Material Copy appearances remain available, but they are not used to imitate Apple's physical Notch.
+`Solid` black is the default. Mica / Acrylic / Glass / Material Copy remain optional appearances.
 
-Native Windows 11 DWM backdrops are probed, but on TopIsland's transparent shaped WPF host they paint rectangular window bounds. The current renderer therefore prioritizes the custom shape instead of showing a rectangular backdrop around it.
+Native DWM backdrop APIs were tested, but on the transparent shaped WPF host they paint rectangular window bounds around the custom geometry. The stable path therefore keeps the real Notch/Island shape intact. A compositor-backed shaped blur remains an isolated experiment rather than a dependency of the working overlay.
 
 ## Build
 
@@ -128,24 +139,20 @@ Publish Windows x64:
 dotnet publish TopIsland/TopIsland.csproj -c Release -r win-x64 --self-contained false -o artifacts/publish
 ```
 
-## Local install
-
-After publishing:
+Install the published build for the current user:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/install-local.ps1
 ```
 
-This installs TopIsland under `%LOCALAPPDATA%\Programs\TopIsland`, creates a Start Menu shortcut and launches it. It does **not** enable startup automatically; that remains an explicit tray setting.
-
-To remove the local installation while keeping user settings:
+Uninstall:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/uninstall-local.ps1
 ```
 
-Settings are stored in `%APPDATA%\TopIsland\settings.json`.
+Local installation uses `%LOCALAPPDATA%\Programs\TopIsland` and creates a Start Menu shortcut. Launch-at-startup remains opt-in.
 
 ## Status
 
-TopIsland is still an interactive prototype, but the core overlay is functional: media/foreground-app integration, typography and geometry transitions, width presets, click-through and no-activate behavior, system tray settings, settings persistence, multiple-display placement, PerMonitorV2 scaling and optional launch-at-startup are working. The main remaining visual/technical experiment is a compositor-backed shaped blur path that does not sacrifice the Notch/Island geometry.
+TopIsland is still an interactive prototype, but its core overlay is functional: media/foreground context, richer live information, focus/download monitoring, Windows notification reading when permitted, geometry/motion, click-through and no-activate behavior, system-tray configuration, persistence, multi-display placement and PerMonitorV2 scaling are working.

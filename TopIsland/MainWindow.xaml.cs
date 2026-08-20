@@ -32,10 +32,14 @@ public partial class MainWindow : Window
     private readonly BackdropMaterialService _backdropService = new();
     private readonly WindowRegionService _windowRegionService = new();
     private readonly StartupService _startupService = new();
+    private readonly DownloadMonitorService _downloadMonitorService = new();
+    private readonly FocusTimerService _focusTimerService = new();
+    private readonly NotificationService _notificationService = new();
     private readonly MonitorService _monitorService;
     private readonly DispatcherTimer _statsTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _mediaTimer = new() { Interval = TimeSpan.FromMilliseconds(850) };
     private readonly DispatcherTimer _themeTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _notificationTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly DispatcherTimer _peekTimer = new();
     private readonly DispatcherTimer _collapseTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
 
@@ -48,6 +52,8 @@ public partial class MainWindow : Window
     private MonitorDescriptor? _currentMonitor;
     private IntPtr _hwnd;
     private double _targetTopDip;
+    private int _notificationCount;
+    private bool _monitorTransitioning;
 
     public event EventHandler? SettingsChanged;
 
@@ -65,6 +71,7 @@ public partial class MainWindow : Window
         _statsTimer.Tick += StatsTimer_Tick;
         _mediaTimer.Tick += MediaTimer_Tick;
         _themeTimer.Tick += ThemeTimer_Tick;
+        _notificationTimer.Tick += NotificationTimer_Tick;
         SizeChanged += (_, _) =>
         {
             UpdateGeometry();
@@ -94,6 +101,8 @@ public partial class MainWindow : Window
             _overlayBehavior.DisplayEnvironmentChanged -= OverlayBehavior_DisplayEnvironmentChanged;
             _overlayBehavior.Detach();
         }
+        _notificationTimer.Stop();
+        _statsService.Dispose();
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -116,7 +125,9 @@ public partial class MainWindow : Window
 
         await _mediaService.InitializeAsync();
         await RefreshMediaAsync();
+        await RefreshNotificationsAsync();
         _mediaTimer.Start();
+        _notificationTimer.Start();
     }
 
     private void OverlayBehavior_DisplayEnvironmentChanged(object? sender, EventArgs e)
@@ -275,8 +286,8 @@ public partial class MainWindow : Window
             case SurfaceState.Expanded:
                 surfaceWidth = _settings.WidthPreset == WidthPreset.FullWidth
                     ? maxWidth
-                    : Math.Min(Math.Max(baseWidth, 640), maxWidth);
-                windowHeight = _settings.Style == IslandStyle.Notch ? 176 : 192;
+                    : Math.Min(Math.Max(baseWidth, 960), maxWidth);
+                windowHeight = _settings.Style == IslandStyle.Notch ? 216 : 264;
                 break;
             default:
                 surfaceWidth = baseWidth;
@@ -471,6 +482,46 @@ public partial class MainWindow : Window
 
     private async void MediaTimer_Tick(object? sender, EventArgs e) => await RefreshMediaAsync();
 
+    private async void NotificationTimer_Tick(object? sender, EventArgs e) => await RefreshNotificationsAsync();
+
+    private async Task RefreshNotificationsAsync()
+    {
+        var snapshot = await _notificationService.SampleAsync();
+        var show = snapshot.AccessAllowed;
+        _notificationCount = show ? snapshot.Count : 0;
+        NotificationColumn.Width = show ? new GridLength(190) : new GridLength(0);
+        NotificationStripGroup.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        NotificationSeparator.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+
+        if (!show)
+        {
+            NotificationPrimaryText.Text = string.Empty;
+            NotificationDetailText.Text = string.Empty;
+            return;
+        }
+
+        if (snapshot.HasNotifications)
+        {
+            NotificationPrimaryText.Text = $"{snapshot.AppName}  ·  {snapshot.Count}";
+            NotificationDetailText.Text = snapshot.Text;
+        }
+        else
+        {
+            NotificationPrimaryText.Text = "No notifications";
+            NotificationDetailText.Text = string.Empty;
+        }
+    }
+
+    public bool NotificationsAllowed => _notificationService.IsAccessAllowed();
+
+    public async Task EnableNotificationsAsync()
+    {
+        _ = await _notificationService.RequestAccessAsync();
+        await RefreshNotificationsAsync();
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+
     private async Task RefreshMediaAsync()
     {
         var media = await _mediaService.SampleAsync();
@@ -553,6 +604,30 @@ public partial class MainWindow : Window
         ExpandedArtworkGlyphPath.Visibility = Visibility.Visible;
     }
 
+    private void FocusToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        _focusTimerService.Toggle();
+        UpdateLiveData();
+    }
+
+    public void StartFocusTimer(int minutes)
+    {
+        _focusTimerService.Start(TimeSpan.FromMinutes(Math.Clamp(minutes, 1, 180)));
+        UpdateLiveData();
+    }
+
+    public void ToggleFocusTimer()
+    {
+        _focusTimerService.Toggle();
+        UpdateLiveData();
+    }
+
+    public void ResetFocusTimer()
+    {
+        _focusTimerService.Reset();
+        UpdateLiveData();
+    }
+
     private async void PreviousMediaButton_Click(object sender, RoutedEventArgs e)
     {
         await _mediaService.PreviousAsync();
@@ -579,9 +654,96 @@ public partial class MainWindow : Window
         ExpandedDateText.Text = now.ToString("M/d ddd");
 
         var stats = _statsService.Sample();
-        CompactStatsText.Text = $"CPU {stats.CpuPercent:0}%   RAM {stats.RamPercent:0}%";
-        ExpandedSystemText.Text = $"CPU {stats.CpuPercent:0}%   RAM {stats.RamPercent:0}%";
+        CompactStatsText.Text = $"CPU {stats.CpuPercent:0}%   GPU {stats.GpuPercent:0}%   RAM {stats.RamPercent:0}%";
+        ExpandedSystemText.Text = $"CPU {stats.CpuPercent:0}%   GPU {stats.GpuPercent:0}%   RAM {stats.RamPercent:0}%";
         ExpandedNetworkText.Text = $"\u2193 {stats.DownloadMbps:0.0}   \u2191 {stats.UploadMbps:0.0} Mbps";
+
+        if (stats.StorageTotalBytes > 0)
+        {
+            var used = Math.Max(0, stats.StorageTotalBytes - stats.StorageFreeBytes);
+            StorageText.Text = $"{FormatBytes(stats.StorageFreeBytes)} free / {FormatBytes(stats.StorageTotalBytes)}";
+            StorageProgressBar.Value = Math.Clamp((double)used / stats.StorageTotalBytes, 0, 1);
+        }
+        else
+        {
+            StorageText.Text = "Unavailable";
+            StorageProgressBar.Value = 0;
+        }
+
+        BatteryStripGroup.Visibility = stats.HasBattery ? Visibility.Visible : Visibility.Collapsed;
+        BatterySeparator.Visibility = stats.HasBattery ? Visibility.Visible : Visibility.Collapsed;
+        BatteryColumn.Width = stats.HasBattery ? new GridLength(120) : new GridLength(0);
+        if (stats.HasBattery)
+        {
+            BatteryText.Text = $"{stats.BatteryPercent:0}%";
+            BatteryStateText.Text = stats.BatteryCharging ? "Charging" : "On battery";
+        }
+
+        var downloads = _downloadMonitorService.Sample();
+        if (downloads.HasActive)
+        {
+            DownloadPrimaryText.Text = downloads.PrimaryName;
+            DownloadDetailText.Text = downloads.PrimaryMegabytesPerSecond > 0.05
+                ? $"{FormatBytes(downloads.PrimaryBytes)}  ·  {downloads.PrimaryMegabytesPerSecond:0.0} MB/s  ·  {downloads.ActiveCount} active"
+                : $"{FormatBytes(downloads.PrimaryBytes)}  ·  {downloads.ActiveCount} active";
+        }
+        else
+        {
+            DownloadPrimaryText.Text = "No active downloads";
+            DownloadDetailText.Text = string.Empty;
+        }
+
+        var focus = _focusTimerService.Snapshot();
+        FocusTimerText.Text = focus.Display;
+        FocusPlayIconViewbox.Visibility = focus.IsRunning ? Visibility.Collapsed : Visibility.Visible;
+        FocusPauseIconViewbox.Visibility = focus.IsRunning ? Visibility.Visible : Visibility.Collapsed;
+
+        var activity = new List<string>();
+        if (focus.IsRunning)
+        {
+            activity.Add($"Focus {focus.Display}");
+        }
+        if (downloads.HasActive)
+        {
+            activity.Add($"DL {downloads.ActiveCount}");
+        }
+        if (_notificationCount > 0)
+        {
+            activity.Add($"N {_notificationCount}");
+        }
+        var compactBaseWidth = ResolveBaseSurfaceWidth(GetTargetScreenWidthDip());
+        if (compactBaseWidth >= 1400)
+        {
+            activity.Add($"NET ↓{stats.DownloadMbps:0.0} ↑{stats.UploadMbps:0.0}");
+            if (stats.StorageFreeBytes > 0)
+            {
+                activity.Add($"SSD {FormatBytes(stats.StorageFreeBytes)}");
+            }
+            if (stats.HasBattery)
+            {
+                activity.Add($"BAT {stats.BatteryPercent:0}%");
+            }
+        }
+        CompactActivityText.Text = string.Join("  ·  ", activity);
+        UpdateCompactDensity();
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 0)
+        {
+            return "--";
+        }
+
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double value = bytes;
+        var unit = 0;
+        while (value >= 1000 && unit < units.Length - 1)
+        {
+            value /= 1000;
+            unit++;
+        }
+        return unit <= 1 ? $"{value:0} {units[unit]}" : $"{value:0.0} {units[unit]}";
     }
 
     private void ThemeTimer_Tick(object? sender, EventArgs e)
@@ -625,9 +787,50 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!force && _settings.MonitorMode == MonitorMode.FollowActiveApp && IsLoaded && IsVisible)
+        {
+            TransitionToMonitor(target);
+            return;
+        }
+
         _currentMonitor = target;
         PositionOnCurrentMonitor();
         Dispatcher.BeginInvoke(() => ApplyState(immediate: true), DispatcherPriority.Loaded);
+    }
+
+    private void TransitionToMonitor(MonitorDescriptor target)
+    {
+        if (_monitorTransitioning)
+        {
+            _currentMonitor = target;
+            PositionOnCurrentMonitor();
+            return;
+        }
+
+        _monitorTransitioning = true;
+        var fadeOut = new DoubleAnimation(Root.Opacity, 0, TimeSpan.FromMilliseconds(80))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+        };
+        fadeOut.Completed += (_, _) =>
+        {
+            _currentMonitor = target;
+            PositionOnCurrentMonitor();
+            ApplyState(immediate: true);
+
+            var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            fadeIn.Completed += (_, _) =>
+            {
+                Root.BeginAnimation(OpacityProperty, null);
+                Root.Opacity = 1;
+                _monitorTransitioning = false;
+            };
+            Root.BeginAnimation(OpacityProperty, fadeIn);
+        };
+        Root.BeginAnimation(OpacityProperty, fadeOut);
     }
 
     private void PositionOnCurrentMonitor()
@@ -780,6 +983,10 @@ public partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         CompactStatsText.Visibility = baseWidth >= 760 || (peek && baseWidth >= 430)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        CompactActivityText.Visibility = !string.IsNullOrWhiteSpace(CompactActivityText.Text)
+            && (baseWidth >= 1000 || (peek && baseWidth >= 700))
             ? Visibility.Visible
             : Visibility.Collapsed;
     }

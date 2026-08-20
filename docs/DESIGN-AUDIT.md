@@ -160,7 +160,22 @@ A wider shell does not justify stretching its content.
 The overlay is an information surface, not the settings window.
 
 - Persistent configuration belongs in the system tray or context menu, not as a permanent card inside Expanded.
-- The tray exposes Show/Hide, Expand, Style, Width, Material, Theme, Display, launch-at-startup, and Quit.
+- The tray exposes Show/Hide, Expand, Style, Width, Material, Theme, Display, Focus timer controls, notification permission when needed, launch-at-startup, and Quit.
 - Display choices are Follow active app, Primary display, or an explicit connected display.
 - Tray and overlay context-menu actions write to the same persisted settings model.
 - Launch-at-startup is always opt-in; installation must not silently enable it.
+
+## Rich information without dashboard cards
+
+More information is allowed only when the surface has enough room and the data is real.
+
+- Expanded uses a primary context row and one secondary information lane, separated by a single horizontal hairline.
+- Secondary groups use vertical hairlines and spacing, not rounded card containers.
+- Current lane modules are Focus, Downloads, Storage, Notifications, and Battery when present.
+- CPU/GPU/RAM and Network remain compact telemetry, not chart cards.
+- Hide a module when the underlying capability is unavailable (for example, Battery on a desktop or Notifications without permission).
+- Never invent download progress, notification content, Discord voice state, battery state, or other live values.
+- Full Width may reveal extra NET / SSD / notification activity, but smaller widths remove those details.
+- A future module must justify its space with current or actionable information; an empty placeholder is not a reason to add another container.
+- Windows notification permission must be opt-in. Do not request it automatically at startup.
+- Cross-monitor Follow active app transitions fade out, recalculate for the destination DPI, and fade in instead of visually sliding through unrelated monitor coordinate spaces.

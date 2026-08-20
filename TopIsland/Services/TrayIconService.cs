@@ -97,6 +97,17 @@ public sealed class TrayIconService : IDisposable
         }
         _menu.Items.Add(displayMenu);
 
+        _menu.Items.Add(Submenu("Focus timer",
+            Item("Start 25 minutes", () => _window.StartFocusTimer(25)),
+            Item("Start 45 minutes", () => _window.StartFocusTimer(45)),
+            Item("Pause / Resume", _window.ToggleFocusTimer),
+            Item("Reset", _window.ResetFocusTimer)));
+
+        if (!_window.NotificationsAllowed)
+        {
+            _menu.Items.Add(Item("Enable notifications", () => _ = _window.EnableNotificationsAsync()));
+        }
+
         _menu.Items.Add(new Forms.ToolStripSeparator());
         _menu.Items.Add(CheckedItem(
             "Launch at startup",
