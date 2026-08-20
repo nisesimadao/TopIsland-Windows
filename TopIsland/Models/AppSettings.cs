@@ -13,6 +13,15 @@ public enum AppThemeMode
     Dark
 }
 
+public enum SurfaceMaterial
+{
+    Solid,
+    Mica,
+    Acrylic,
+    AppleGlass,
+    MaterialCopy
+}
+
 public enum WidthPreset
 {
     Authentic,
@@ -27,6 +36,7 @@ public sealed class AppSettings
 {
     public IslandStyle Style { get; set; } = IslandStyle.DynamicIsland;
     public AppThemeMode Theme { get; set; } = AppThemeMode.System;
+    public SurfaceMaterial Material { get; set; } = SurfaceMaterial.Acrylic;
     public WidthPreset WidthPreset { get; set; } = WidthPreset.Standard;
     public double CustomWidth { get; set; } = 560;
     public double SideMargin { get; set; } = 20;

@@ -4,6 +4,7 @@ using System.Windows.Media.Imaging;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using TopIsland.Controls;
 using TopIsland.Interop;
@@ -27,6 +28,8 @@ public partial class MainWindow : Window
     private readonly SystemStatsService _statsService = new();
     private readonly MediaSessionService _mediaService = new();
     private readonly ForegroundAppService _foregroundAppService = new();
+    private readonly BackdropMaterialService _backdropService = new();
+    private readonly WindowRegionService _windowRegionService = new();
     private readonly DispatcherTimer _statsTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _mediaTimer = new() { Interval = TimeSpan.FromMilliseconds(850) };
     private readonly DispatcherTimer _themeTimer = new() { Interval = TimeSpan.FromSeconds(1) };
@@ -38,6 +41,7 @@ public partial class MainWindow : Window
     private bool _lastSystemLight;
     private bool _initializing = true;
     private OverlayWindowBehavior? _overlayBehavior;
+    private BackdropApplyResult _backdropResult = new(false, false, "Unavailable");
     private byte[]? _lastArtworkBytes;
 
     public MainWindow()
@@ -61,11 +65,12 @@ public partial class MainWindow : Window
     {
         _overlayBehavior = new OverlayWindowBehavior(this, point => SurfacePath.Data?.FillContains(point) == true);
         _overlayBehavior.Attach();
+        ApplyBackdropMaterial();
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        _themeService.Apply(_settings.Theme);
+        _themeService.Apply(_settings.Theme, _settings.Material);
         _lastSystemLight = _themeService.IsSystemLightTheme();
         SyncSettingsUi();
 
@@ -167,8 +172,8 @@ public partial class MainWindow : Window
 
         SurfacePath.SetResourceReference(System.Windows.Shapes.Path.FillProperty,
             _state is SurfaceState.Hover or SurfaceState.Peek ? "SurfaceHoverBrush" : "SurfaceBrush");
-        SurfaceShadow.BlurRadius = _state == SurfaceState.Idle ? 22 : 28;
-        SurfaceShadow.Opacity = _state == SurfaceState.Idle ? 0.30 : 0.40;
+        var nativeBackdrop = _backdropResult.NativeApplied && _settings.Material != SurfaceMaterial.Solid;
+        AnimateShadow(_state == SurfaceState.Idle ? 22 : 30, nativeBackdrop ? 0 : (_state == SurfaceState.Idle ? 0.28 : 0.42), immediate);
 
         ConfigureContentMargins();
         AnimateWindow(target.Width, target.Height, target.Top, duration, heightDelay);
@@ -194,7 +199,7 @@ public partial class MainWindow : Window
                 break;
             case SurfaceState.Expanded:
                 surfaceWidth = Math.Min(Math.Max(baseWidth * 1.38, 820), screenWidth - _settings.SideMargin * 2);
-                windowHeight = 324;
+                windowHeight = 398;
                 break;
             default:
                 surfaceWidth = baseWidth;
@@ -293,6 +298,31 @@ public partial class MainWindow : Window
         element.BeginAnimation(OpacityProperty, animation);
     }
 
+    private void AnimateShadow(double blur, double opacity, bool immediate)
+    {
+        if (immediate)
+        {
+            SurfaceShadow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, null);
+            SurfaceShadow.BeginAnimation(DropShadowEffect.OpacityProperty, null);
+            SurfaceShadow.BlurRadius = blur;
+            SurfaceShadow.Opacity = opacity;
+            return;
+        }
+
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        SurfaceShadow.BeginAnimation(
+            DropShadowEffect.BlurRadiusProperty,
+            new DoubleAnimation(SurfaceShadow.BlurRadius, blur, TimeSpan.FromMilliseconds(230))
+            {
+                EasingFunction = ease
+            });
+        SurfaceShadow.BeginAnimation(
+            DropShadowEffect.OpacityProperty,
+            new DoubleAnimation(SurfaceShadow.Opacity, opacity, TimeSpan.FromMilliseconds(230))
+            {
+                EasingFunction = ease
+            });
+    }
     private void ConfigureContentMargins()
     {
         if (_settings.Style == IslandStyle.Notch)
@@ -320,6 +350,15 @@ public partial class MainWindow : Window
             _state == SurfaceState.Expanded);
         SurfacePath.Data = geometry;
         ContentHost.Clip = geometry;
+
+        if (_backdropResult.NativeApplied && _settings.Material != SurfaceMaterial.Solid)
+        {
+            _windowRegionService.Apply(this, geometry);
+        }
+        else
+        {
+            _windowRegionService.Reset(this);
+        }
     }
 
     private void StatsTimer_Tick(object? sender, EventArgs e) => UpdateLiveData();
@@ -457,7 +496,8 @@ public partial class MainWindow : Window
         }
 
         _lastSystemLight = current;
-        _themeService.Apply(AppThemeMode.System);
+        _themeService.Apply(AppThemeMode.System, _settings.Material);
+        ApplyBackdropMaterial();
     }
 
     private void StyleToggleButton_Click(object sender, RoutedEventArgs e)
@@ -466,6 +506,21 @@ public partial class MainWindow : Window
         SaveAndRefresh();
     }
 
+    private void MaterialButton_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.Material = _settings.Material switch
+        {
+            SurfaceMaterial.Solid => SurfaceMaterial.Mica,
+            SurfaceMaterial.Mica => SurfaceMaterial.Acrylic,
+            SurfaceMaterial.Acrylic => SurfaceMaterial.AppleGlass,
+            SurfaceMaterial.AppleGlass => SurfaceMaterial.MaterialCopy,
+            _ => SurfaceMaterial.Solid
+        };
+
+        _themeService.Apply(_settings.Theme, _settings.Material);
+        ApplyBackdropMaterial();
+        SaveAndRefresh();
+    }
     private void WidthPresetButton_Click(object sender, RoutedEventArgs e)
     {
         _settings.WidthPreset = _settings.WidthPreset switch
@@ -488,7 +543,8 @@ public partial class MainWindow : Window
             AppThemeMode.Dark => AppThemeMode.Light,
             _ => AppThemeMode.System
         };
-        _themeService.Apply(_settings.Theme);
+        _themeService.Apply(_settings.Theme, _settings.Material);
+        ApplyBackdropMaterial();
         SaveAndRefresh();
     }
 
@@ -516,6 +572,8 @@ public partial class MainWindow : Window
     private void SyncSettingsUi()
     {
         StyleToggleButton.Content = _settings.Style == IslandStyle.DynamicIsland ? "Dynamic Island" : "Notch";
+        MaterialButton.Content = MaterialDisplayName(_settings.Material);
+        UpdateMaterialStatusText();
         WidthPresetButton.Content = _settings.WidthPreset switch
         {
             WidthPreset.FullWidth => "Full width",
@@ -541,4 +599,35 @@ public partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
+    private void ApplyBackdropMaterial()
+    {
+        _backdropResult = _backdropService.Apply(this, _settings.Material, _settings.Theme, _themeService);
+        UpdateGeometry();
+        UpdateMaterialStatusText();
+    }
+
+    private void UpdateMaterialStatusText()
+    {
+        if (!IsLoaded && PresentationSource.FromVisual(this) is null)
+        {
+            return;
+        }
+
+        if (_settings.Material == SurfaceMaterial.Solid)
+        {
+            MaterialNativeText.Text = "Native backdrop: off";
+            return;
+        }
+
+        MaterialNativeText.Text = _backdropResult.NativeApplied
+            ? $"Native: {_backdropResult.NativeKind} + TopIsland tint"
+            : $"Shape-safe: {MaterialDisplayName(_settings.Material)}";
+    }
+
+    private static string MaterialDisplayName(SurfaceMaterial material) => material switch
+    {
+        SurfaceMaterial.AppleGlass => "Apple Glass",
+        SurfaceMaterial.MaterialCopy => "Material Copy",
+        _ => material.ToString()
+    };
 }
