@@ -12,12 +12,16 @@ public sealed class OverlayWindowBehavior
     private const int WsExNoActivate = 0x08000000;
     private const int WmNcHitTest = 0x0084;
     private const int WmMouseActivate = 0x0021;
+    private const int WmDpiChanged = 0x02E0;
+    private const int WmDisplayChange = 0x007E;
     private const int HtTransparent = -1;
     private const int MaNoActivate = 3;
 
     private readonly Window _window;
     private readonly Func<Point, bool> _containsSurface;
     private HwndSource? _source;
+
+    public event EventHandler? DisplayEnvironmentChanged;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
@@ -56,6 +60,11 @@ public sealed class OverlayWindowBehavior
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        if (msg is WmDpiChanged or WmDisplayChange)
+        {
+            _window.Dispatcher.BeginInvoke(() => DisplayEnvironmentChanged?.Invoke(this, EventArgs.Empty));
+        }
+
         if (msg == WmMouseActivate)
         {
             handled = true;

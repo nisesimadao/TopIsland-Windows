@@ -1,11 +1,13 @@
 using System.Threading;
 using System.Windows;
+using TopIsland.Services;
 
 namespace TopIsland;
 
 public partial class App : Application
 {
     private Mutex? _singleInstanceMutex;
+    private TrayIconService? _trayIcon;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -17,10 +19,19 @@ public partial class App : Application
         }
 
         base.OnStartup(e);
+
+        var monitorService = new MonitorService();
+        var window = new MainWindow(monitorService);
+        MainWindow = window;
+        window.Show();
+        _trayIcon = new TrayIconService(window, monitorService);
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _trayIcon?.Dispose();
+        _trayIcon = null;
+
         if (_singleInstanceMutex is not null)
         {
             try

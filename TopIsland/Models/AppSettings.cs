@@ -32,6 +32,13 @@ public enum WidthPreset
     Custom
 }
 
+public enum MonitorMode
+{
+    FollowActiveApp,
+    Primary,
+    Fixed
+}
+
 public sealed class AppSettings
 {
     public IslandStyle Style { get; set; } = IslandStyle.DynamicIsland;
@@ -43,4 +50,7 @@ public sealed class AppSettings
     public bool EnableHoverPeek { get; set; } = true;
     public int HoverPeekDelayMs { get; set; } = 650;
     public bool StartExpanded { get; set; }
+    public MonitorMode MonitorMode { get; set; } = MonitorMode.FollowActiveApp;
+    public string? MonitorDeviceName { get; set; }
+    public bool StartWithWindows { get; set; }
 }

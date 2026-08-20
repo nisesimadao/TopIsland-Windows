@@ -1,10 +1,11 @@
 using System.IO;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using TopIsland.Controls;
 using TopIsland.Interop;
@@ -30,6 +31,8 @@ public partial class MainWindow : Window
     private readonly ForegroundAppService _foregroundAppService = new();
     private readonly BackdropMaterialService _backdropService = new();
     private readonly WindowRegionService _windowRegionService = new();
+    private readonly StartupService _startupService = new();
+    private readonly MonitorService _monitorService;
     private readonly DispatcherTimer _statsTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _mediaTimer = new() { Interval = TimeSpan.FromMilliseconds(850) };
     private readonly DispatcherTimer _themeTimer = new() { Interval = TimeSpan.FromSeconds(1) };
@@ -42,9 +45,17 @@ public partial class MainWindow : Window
     private OverlayWindowBehavior? _overlayBehavior;
     private BackdropApplyResult _backdropResult = new(false, false, "Unavailable");
     private byte[]? _lastArtworkBytes;
+    private MonitorDescriptor? _currentMonitor;
+    private IntPtr _hwnd;
+    private double _targetTopDip;
 
-    public MainWindow()
+    public event EventHandler? SettingsChanged;
+
+    public AppSettings Settings => _settings;
+
+    public MainWindow(MonitorService monitorService)
     {
+        _monitorService = monitorService;
         InitializeComponent();
 
         _settings = _settingsStore.Load();
@@ -54,23 +65,47 @@ public partial class MainWindow : Window
         _statsTimer.Tick += StatsTimer_Tick;
         _mediaTimer.Tick += MediaTimer_Tick;
         _themeTimer.Tick += ThemeTimer_Tick;
-        SizeChanged += (_, _) => UpdateGeometry();
+        SizeChanged += (_, _) =>
+        {
+            UpdateGeometry();
+            PositionOnCurrentMonitor();
+        };
         SourceInitialized += MainWindow_SourceInitialized;
-        Closed += (_, _) => _overlayBehavior?.Detach();
+        Closed += MainWindow_Closed;
         Loaded += MainWindow_Loaded;
     }
 
     private void MainWindow_SourceInitialized(object? sender, EventArgs e)
     {
+        _hwnd = new WindowInteropHelper(this).Handle;
         _overlayBehavior = new OverlayWindowBehavior(this, point => SurfacePath.Data?.FillContains(point) == true);
+        _overlayBehavior.DisplayEnvironmentChanged += OverlayBehavior_DisplayEnvironmentChanged;
         _overlayBehavior.Attach();
+
+        _currentMonitor = _monitorService.Resolve(_settings);
         ApplyBackdropMaterial();
+        PositionOnCurrentMonitor();
+    }
+
+    private void MainWindow_Closed(object? sender, EventArgs e)
+    {
+        if (_overlayBehavior is not null)
+        {
+            _overlayBehavior.DisplayEnvironmentChanged -= OverlayBehavior_DisplayEnvironmentChanged;
+            _overlayBehavior.Detach();
+        }
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         _themeService.Apply(_settings.Theme, _settings.Material);
         _lastSystemLight = _themeService.IsSystemLightTheme();
+        if (_settings.StartWithWindows)
+        {
+            _startupService.SetEnabled(true);
+        }
+
+        RefreshTargetMonitor(force: true);
         SyncSettingsUi();
 
         _state = _settings.StartExpanded ? SurfaceState.Expanded : SurfaceState.Idle;
@@ -82,6 +117,11 @@ public partial class MainWindow : Window
         await _mediaService.InitializeAsync();
         await RefreshMediaAsync();
         _mediaTimer.Start();
+    }
+
+    private void OverlayBehavior_DisplayEnvironmentChanged(object? sender, EventArgs e)
+    {
+        RefreshTargetMonitor(force: true);
     }
 
     private void Root_MouseEnter(object sender, MouseEventArgs e)
@@ -127,7 +167,6 @@ public partial class MainWindow : Window
         _state = SurfaceState.Peek;
         ApplyState();
     }
-
 
     private void CollapseTimer_Tick(object? sender, EventArgs e)
     {
@@ -211,13 +250,13 @@ public partial class MainWindow : Window
 
         ConfigureContentMargins();
         UpdateCompactDensity();
-        AnimateWindow(target.Width, target.Height, target.Top, duration, 0);
+        AnimateWindow(target.Width, target.Height, target.Top, duration);
         UpdateGeometry();
     }
 
     private (double Width, double Height, double Top) ResolveLayout(SurfaceState state)
     {
-        var screenWidth = GetPrimaryScreenWidthDip();
+        var screenWidth = GetTargetScreenWidthDip();
         var baseWidth = ResolveBaseSurfaceWidth(screenWidth);
         var maxWidth = Math.Max(185, screenWidth - _settings.SideMargin * 2);
         double surfaceWidth;
@@ -226,12 +265,12 @@ public partial class MainWindow : Window
         switch (state)
         {
             case SurfaceState.Hover:
-                surfaceWidth = baseWidth * 1.02;
-                windowHeight = _settings.Style == IslandStyle.Notch ? 54 : 70;
+                surfaceWidth = baseWidth * 1.015;
+                windowHeight = _settings.Style == IslandStyle.Notch ? 53 : 69;
                 break;
             case SurfaceState.Peek:
-                surfaceWidth = baseWidth * 1.04;
-                windowHeight = _settings.Style == IslandStyle.Notch ? 58 : 72;
+                surfaceWidth = baseWidth * 1.035;
+                windowHeight = _settings.Style == IslandStyle.Notch ? 58 : 73;
                 break;
             case SurfaceState.Expanded:
                 surfaceWidth = _settings.WidthPreset == WidthPreset.FullWidth
@@ -256,8 +295,13 @@ public partial class MainWindow : Window
         return (windowWidth, windowHeight, top);
     }
 
-    private double GetPrimaryScreenWidthDip()
+    private double GetTargetScreenWidthDip()
     {
+        if (_currentMonitor is not null)
+        {
+            return _currentMonitor.DipWidth;
+        }
+
         var source = PresentationSource.FromVisual(this);
         var transform = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
         return SystemParameters.PrimaryScreenWidth * transform.M11;
@@ -277,37 +321,31 @@ public partial class MainWindow : Window
         };
     }
 
-    private void AnimateWindow(double targetWidth, double targetHeight, double targetTop, int durationMs, int heightDelayMs)
+    private void AnimateWindow(double targetWidth, double targetHeight, double targetTop, int durationMs)
     {
-        var screenWidth = GetPrimaryScreenWidthDip();
-        var targetLeft = (screenWidth - targetWidth) / 2.0;
+        _targetTopDip = targetTop;
+        PositionOnCurrentMonitor();
 
         if (durationMs <= 0)
         {
             BeginAnimation(WidthProperty, null);
             BeginAnimation(HeightProperty, null);
-            BeginAnimation(LeftProperty, null);
-            BeginAnimation(TopProperty, null);
             Width = targetWidth;
             Height = targetHeight;
-            Left = targetLeft;
-            Top = targetTop;
             UpdateGeometry();
+            PositionOnCurrentMonitor();
             return;
         }
 
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        BeginAnimation(WidthProperty, CreateAnimation(ActualWidth > 0 ? ActualWidth : Width, targetWidth, durationMs, 0, ease));
-        BeginAnimation(LeftProperty, CreateAnimation(double.IsNaN(Left) ? targetLeft : Left, targetLeft, durationMs, 0, ease));
-        BeginAnimation(TopProperty, CreateAnimation(double.IsNaN(Top) ? targetTop : Top, targetTop, durationMs, 0, ease));
-        BeginAnimation(HeightProperty, CreateAnimation(ActualHeight > 0 ? ActualHeight : Height, targetHeight, durationMs, heightDelayMs, ease));
+        BeginAnimation(WidthProperty, CreateAnimation(ActualWidth > 0 ? ActualWidth : Width, targetWidth, durationMs, ease));
+        BeginAnimation(HeightProperty, CreateAnimation(ActualHeight > 0 ? ActualHeight : Height, targetHeight, durationMs, ease));
     }
 
-    private static DoubleAnimation CreateAnimation(double from, double to, int durationMs, int delayMs, IEasingFunction easing)
+    private static DoubleAnimation CreateAnimation(double from, double to, int durationMs, IEasingFunction easing)
     {
         return new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(durationMs))
         {
-            BeginTime = TimeSpan.FromMilliseconds(delayMs),
             EasingFunction = easing,
             FillBehavior = FillBehavior.HoldEnd
         };
@@ -386,6 +424,7 @@ public partial class MainWindow : Window
                 EasingFunction = ease
             });
     }
+
     private void ConfigureContentMargins()
     {
         if (_settings.Style == IslandStyle.Notch)
@@ -424,15 +463,24 @@ public partial class MainWindow : Window
         }
     }
 
-    private void StatsTimer_Tick(object? sender, EventArgs e) => UpdateLiveData();
+    private void StatsTimer_Tick(object? sender, EventArgs e)
+    {
+        UpdateLiveData();
+        RefreshTargetMonitor(force: false);
+    }
 
     private async void MediaTimer_Tick(object? sender, EventArgs e) => await RefreshMediaAsync();
 
     private async Task RefreshMediaAsync()
     {
         var media = await _mediaService.SampleAsync();
+        byte[]? artwork;
+        bool isMedia;
+
         if (media.HasSession)
         {
+            isMedia = true;
+            artwork = media.Artwork;
             MediaTitleText.Text = media.Title;
             MediaSubtitleText.Text = media.Subtitle;
             ExpandedMediaTitle.Text = media.Title;
@@ -442,14 +490,16 @@ public partial class MainWindow : Window
         }
         else
         {
+            isMedia = false;
             var foreground = _foregroundAppService.Sample();
+            artwork = foreground.IconPng;
             MediaTitleText.Text = foreground.Title;
             MediaSubtitleText.Text = foreground.ProcessName;
             ExpandedMediaTitle.Text = foreground.Title;
             ExpandedMediaSubtitle.Text = foreground.ProcessName;
         }
 
-        ApplyArtwork(media.Artwork);
+        ApplyArtwork(artwork, isMedia);
         MediaProgressBar.Value = media.Progress;
         MediaProgressBar.Visibility = media.HasSession ? Visibility.Visible : Visibility.Collapsed;
         MediaControlsPanel.Visibility = media.HasSession ? Visibility.Visible : Visibility.Collapsed;
@@ -460,7 +510,7 @@ public partial class MainWindow : Window
         PauseIconViewbox.Visibility = media.IsPlaying ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void ApplyArtwork(byte[]? bytes)
+    private void ApplyArtwork(byte[]? bytes, bool isMedia)
     {
         if (ReferenceEquals(_lastArtworkBytes, bytes))
         {
@@ -480,17 +530,15 @@ public partial class MainWindow : Window
                 image.EndInit();
                 image.Freeze();
 
-                var compactBrush = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
-                var expandedBrush = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
-                MediaArtworkBorder.Background = compactBrush;
-                ExpandedArtworkBorder.Background = expandedBrush;
+                MediaArtworkBorder.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
+                ExpandedArtworkBorder.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill };
                 MediaGlyphPath.Visibility = Visibility.Collapsed;
                 ExpandedArtworkGlyphPath.Visibility = Visibility.Collapsed;
                 return;
             }
             catch
             {
-                // Fall through to the lightweight glyph placeholder.
+                // Fall through to the vector placeholder.
             }
         }
 
@@ -498,6 +546,9 @@ public partial class MainWindow : Window
         fallback.Freeze();
         MediaArtworkBorder.Background = fallback;
         ExpandedArtworkBorder.Background = fallback;
+        var fallbackGeometry = (Geometry)FindResource(isMedia ? "MediaFallbackGeometry" : "ActiveAppFallbackGeometry");
+        MediaGlyphPath.Data = fallbackGeometry;
+        ExpandedArtworkGlyphPath.Data = fallbackGeometry;
         MediaGlyphPath.Visibility = Visibility.Visible;
         ExpandedArtworkGlyphPath.Visibility = Visibility.Visible;
     }
@@ -519,7 +570,6 @@ public partial class MainWindow : Window
         await _mediaService.NextAsync();
         await RefreshMediaAsync();
     }
-
 
     private void UpdateLiveData()
     {
@@ -552,6 +602,44 @@ public partial class MainWindow : Window
         ApplyBackdropMaterial();
     }
 
+    private void RefreshTargetMonitor(bool force)
+    {
+        MonitorDescriptor target;
+        try
+        {
+            target = _monitorService.Resolve(_settings);
+        }
+        catch
+        {
+            return;
+        }
+
+        var changed = _currentMonitor is null
+                      || _currentMonitor.Handle != target.Handle
+                      || _currentMonitor.ScalePercent != target.ScalePercent
+                      || _currentMonitor.PixelWidth != target.PixelWidth
+                      || _currentMonitor.PixelHeight != target.PixelHeight;
+
+        if (!force && !changed)
+        {
+            return;
+        }
+
+        _currentMonitor = target;
+        PositionOnCurrentMonitor();
+        Dispatcher.BeginInvoke(() => ApplyState(immediate: true), DispatcherPriority.Loaded);
+    }
+
+    private void PositionOnCurrentMonitor()
+    {
+        if (_hwnd == IntPtr.Zero || _currentMonitor is null)
+        {
+            return;
+        }
+
+        _monitorService.PositionWindow(_hwnd, _currentMonitor, _targetTopDip);
+    }
+
     private void SetDynamicIsland_Click(object sender, RoutedEventArgs e) => SetStyle(IslandStyle.DynamicIsland);
     private void SetNotch_Click(object sender, RoutedEventArgs e) => SetStyle(IslandStyle.Notch);
 
@@ -571,7 +659,7 @@ public partial class MainWindow : Window
     private void SetDarkTheme_Click(object sender, RoutedEventArgs e) => SetTheme(AppThemeMode.Dark);
     private void SetLightTheme_Click(object sender, RoutedEventArgs e) => SetTheme(AppThemeMode.Light);
 
-    private void SetStyle(IslandStyle style)
+    public void SetStyle(IslandStyle style)
     {
         _settings.Style = style;
         if (style == IslandStyle.Notch)
@@ -583,13 +671,13 @@ public partial class MainWindow : Window
         SaveAndRefresh();
     }
 
-    private void SetWidth(WidthPreset width)
+    public void SetWidth(WidthPreset width)
     {
         _settings.WidthPreset = width;
         SaveAndRefresh();
     }
 
-    private void SetMaterial(SurfaceMaterial material)
+    public void SetMaterial(SurfaceMaterial material)
     {
         _settings.Material = material;
         _themeService.Apply(_settings.Theme, _settings.Material);
@@ -597,12 +685,55 @@ public partial class MainWindow : Window
         SaveAndRefresh();
     }
 
-    private void SetTheme(AppThemeMode theme)
+    public void SetTheme(AppThemeMode theme)
     {
         _settings.Theme = theme;
         _themeService.Apply(_settings.Theme, _settings.Material);
         ApplyBackdropMaterial();
         SaveAndRefresh();
+    }
+
+    public void SetMonitor(MonitorMode mode, string? deviceName)
+    {
+        _settings.MonitorMode = mode;
+        _settings.MonitorDeviceName = mode == MonitorMode.Fixed ? deviceName : null;
+        _settingsStore.Save(_settings);
+        RefreshTargetMonitor(force: true);
+        SyncSettingsUi();
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SetStartWithWindows(bool enabled)
+    {
+        _settings.StartWithWindows = enabled;
+        _startupService.SetEnabled(enabled);
+        _settingsStore.Save(_settings);
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void ToggleVisibilityFromTray()
+    {
+        if (IsVisible)
+        {
+            Hide();
+        }
+        else
+        {
+            Show();
+            ApplyState(immediate: true);
+            PositionOnCurrentMonitor();
+        }
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void ExpandFromTray()
+    {
+        if (!IsVisible)
+        {
+            Show();
+        }
+        _state = SurfaceState.Expanded;
+        ApplyState();
     }
 
     private void ExitButton_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
@@ -612,6 +743,7 @@ public partial class MainWindow : Window
         _settingsStore.Save(_settings);
         SyncSettingsUi();
         ApplyState();
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void SyncSettingsUi()
@@ -640,14 +772,16 @@ public partial class MainWindow : Window
 
     private void UpdateCompactDensity()
     {
-        var baseWidth = ResolveBaseSurfaceWidth(GetPrimaryScreenWidthDip());
+        var baseWidth = ResolveBaseSurfaceWidth(GetTargetScreenWidthDip());
         var peek = _state == SurfaceState.Peek;
 
-        // Prefer removing detail to compressing every element. This keeps the
-        // compact surface readable instead of turning it into a tiny dashboard.
         CompactMediaText.Visibility = baseWidth >= 240 ? Visibility.Visible : Visibility.Collapsed;
-        MediaSubtitleText.Visibility = baseWidth >= (peek ? 300 : 360) ? Visibility.Visible : Visibility.Collapsed;
-        CompactStatsText.Visibility = baseWidth >= (peek ? 430 : 520) ? Visibility.Visible : Visibility.Collapsed;
+        MediaSubtitleText.Visibility = baseWidth >= 600 || (peek && baseWidth >= 300)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        CompactStatsText.Visibility = baseWidth >= 760 || (peek && baseWidth >= 430)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void ApplyBackdropMaterial()
@@ -655,5 +789,4 @@ public partial class MainWindow : Window
         _backdropResult = _backdropService.Apply(this, _settings.Material, _settings.Theme, _themeService);
         UpdateGeometry();
     }
-
 }
