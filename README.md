@@ -20,7 +20,7 @@ TopIsland is a **top-center Windows overlay** for media and lightweight system s
 The default design is deliberately simple: **one black surface, contextual information density, no dashboard of nested cards**.
 
 <p align="center">
-  <img src="docs/screenshots/notch-expanded.png" alt="TopIsland expanded Notch running over Minecraft" width="100%">
+  <img src="docs/screenshots/notch-expanded.png" alt="TopIsland expanded Notch running on Windows" width="100%">
 </p>
 
 > Real runtime capture from the WPF app, cropped around TopIsland so the layout is readable on GitHub.
@@ -75,7 +75,7 @@ Those radii are **independent of width**, so Full Width does not stretch the sho
 - **Authentic Notch:** artwork + time
 - **Compact:** add media title
 - **Standard:** add subtitle
-- **430 px and wider:** compact CPU/RAM can appear
+- **Idle at 520 dip+ / Peek at 430 dip+:** compact CPU/RAM can appear
 - **Expanded:** artwork + media controls + a single right-aligned status group
 
 There is no permanent settings card inside the expanded surface. Configuration lives in the context menu instead.
@@ -105,4 +105,4 @@ dotnet publish TopIsland/TopIsland.csproj -c Release -r win-x64 --self-contained
 
 ## Status
 
-TopIsland is still an interactive prototype. Media integration, geometry transitions, width presets, click-through behavior, focus preservation, material switching and settings persistence are working. Multi-monitor / per-monitor DPI and a compositor-backed shaped blur path are still in progress.
+TopIsland is still an interactive prototype. Media integration, geometry transitions, width presets, click-through behavior, focus preservation, material switching and settings persistence are working. Primary-monitor DPI-aware positioning and hit testing are working. Multi-monitor / per-monitor DPI transitions and a compositor-backed shaped blur path are still in progress.

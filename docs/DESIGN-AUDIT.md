@@ -71,7 +71,8 @@ Expanded Notch follows the BoringNotch relationship:
 - Authentic Notch: artwork + one compact status (currently time)
 - Compact: add title
 - Standard: add subtitle
-- >= 430 px: allow compact CPU/RAM
+- Idle >= 520 dip: allow compact CPU/RAM
+- Peek >= 430 dip: allow compact CPU/RAM
 - Expanded: artwork + media information + controls + one right-aligned system/time group
 
 Do not scale typography down to preserve content. Remove lower-priority content instead.
@@ -111,3 +112,32 @@ Before merging visual changes:
 - Does the Notch shoulder still look like a radius rather than a stretched curve?
 - Are all icons vector/system icons?
 - Does the UI remain readable over a busy background without adding fake glass decoration?
+
+## Typography and motion
+
+- Use `Segoe UI Variable` on supported Windows installations; do not bundle or imitate SF Pro.
+- Titles are the strongest text but should stay at `SemiBold`, not heavy display weights.
+- Secondary/source text is smaller and quieter; it must not compete with the title.
+- Clock and changing numeric telemetry use tabular numeral alignment so updates do not shift the layout.
+- Expanded content fades and moves only a few device-independent pixels. Avoid large slides, bounce, scale pulses, and decorative spring overshoot.
+- Compact and Expanded are alternate presentations of the same surface; do not show both information layouts at once.
+
+## DPI and coordinates
+
+TopIsland uses WPF device-independent pixels (DIPs) for layout. Monitor dimensions and hit testing must be converted into the same coordinate space before comparisons are made.
+
+- Do not mix physical monitor pixels with WPF `Width`, `Left`, or geometry coordinates.
+- Primary-monitor centering must use the monitor width converted to DIPs.
+- Win32 hit testing converts `ScreenToClient` device pixels through the window composition target's `TransformFromDevice` before checking the WPF geometry.
+- A visual center and an input center must resolve to the same point at 100%, 125%, 150%, and other DPI scales.
+- Per-monitor DPI transitions are still a separate follow-up; do not assume the primary monitor conversion solves monitor changes.
+
+## Wide and Full Width layouts
+
+A wider shell does not justify stretching its content.
+
+- Full Width extends the outer surface while preserving safe margins.
+- The media information/progress/control column has a readable maximum width (`520 dip` in the current layout).
+- Status information may remain anchored to the right edge.
+- Empty space between content groups is preferable to stretching progress bars, text blocks, or artwork to fill the shell.
+- Width changes may reveal additional information, but should not distort component proportions.

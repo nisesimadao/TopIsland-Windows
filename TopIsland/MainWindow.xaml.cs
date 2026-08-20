@@ -87,7 +87,6 @@ public partial class MainWindow : Window
     private void Root_MouseEnter(object sender, MouseEventArgs e)
     {
         _collapseTimer.Stop();
-        CompactBar.Visibility = _state == SurfaceState.Expanded ? Visibility.Hidden : Visibility.Visible;
         if (_state == SurfaceState.Expanded)
         {
             return;
@@ -106,7 +105,6 @@ public partial class MainWindow : Window
     private void Root_MouseLeave(object sender, MouseEventArgs e)
     {
         _peekTimer.Stop();
-        CompactBar.Visibility = _state == SurfaceState.Expanded ? Visibility.Hidden : Visibility.Visible;
         if (_state == SurfaceState.Expanded)
         {
             _collapseTimer.Stop();
@@ -152,34 +150,74 @@ public partial class MainWindow : Window
     private void ApplyState(bool immediate = false)
     {
         var target = ResolveLayout(_state);
-        var duration = immediate ? 0 : (_state == SurfaceState.Expanded ? 300 : 170);
-        var heightDelay = !immediate && _settings.Style == IslandStyle.Notch && _state == SurfaceState.Expanded ? 40 : 0;
+        var duration = immediate ? 0 : _state switch
+        {
+            SurfaceState.Expanded => 260,
+            SurfaceState.Idle => 200,
+            SurfaceState.Peek => 175,
+            _ => 145
+        };
 
-        CompactBar.Visibility = _state == SurfaceState.Expanded ? Visibility.Hidden : Visibility.Visible;
         if (_state == SurfaceState.Expanded)
         {
+            if (immediate)
+            {
+                CompactBar.Visibility = Visibility.Hidden;
+                CompactBar.Opacity = 0;
+                ExpandedTranslate.Y = 0;
+            }
+            else
+            {
+                AnimateOpacity(CompactBar, 0, 70, 0, hideOnComplete: true);
+                ExpandedTranslate.Y = -4;
+            }
+
             ExpandedPanel.Visibility = Visibility.Visible;
-            AnimateOpacity(ExpandedPanel, 1, immediate ? 0 : 210, immediate ? 0 : 80);
+            AnimateOpacity(ExpandedPanel, 1, immediate ? 0 : 175, immediate ? 0 : 55);
+            AnimateTranslate(ExpandedTranslate, 0, immediate ? 0 : 220, immediate ? 0 : 35);
         }
         else
         {
-            AnimateOpacity(ExpandedPanel, 0, immediate ? 0 : 120, 0, hideOnComplete: true);
+            AnimateOpacity(ExpandedPanel, 0, immediate ? 0 : 90, 0, hideOnComplete: true);
+            AnimateTranslate(ExpandedTranslate, -4, immediate ? 0 : 100, 0);
+
+            CompactBar.Visibility = Visibility.Visible;
+            if (immediate)
+            {
+                CompactBar.Opacity = 1;
+            }
+            else
+            {
+                AnimateOpacity(CompactBar, 1, 130, 45);
+            }
         }
 
         SurfacePath.SetResourceReference(System.Windows.Shapes.Path.FillProperty,
             _state is SurfaceState.Hover or SurfaceState.Peek ? "SurfaceHoverBrush" : "SurfaceBrush");
-        var idleShadow = _settings.Style == IslandStyle.Notch ? 0.0 : 0.22;
-        var shadowOpacity = _state == SurfaceState.Idle ? idleShadow : 0.42;
-        AnimateShadow(_state == SurfaceState.Idle ? 10 : 14, shadowOpacity, immediate);
+
+        var shadowOpacity = _state switch
+        {
+            SurfaceState.Idle => _settings.Style == IslandStyle.Notch ? 0.0 : 0.16,
+            SurfaceState.Expanded => _settings.Style == IslandStyle.Notch ? 0.34 : 0.30,
+            _ => _settings.Style == IslandStyle.Notch ? 0.26 : 0.24
+        };
+        var shadowBlur = _state switch
+        {
+            SurfaceState.Idle => 8.0,
+            SurfaceState.Expanded => 12.0,
+            _ => 10.0
+        };
+        AnimateShadow(shadowBlur, shadowOpacity, immediate);
 
         ConfigureContentMargins();
-        AnimateWindow(target.Width, target.Height, target.Top, duration, heightDelay);
+        UpdateCompactDensity();
+        AnimateWindow(target.Width, target.Height, target.Top, duration, 0);
         UpdateGeometry();
     }
 
     private (double Width, double Height, double Top) ResolveLayout(SurfaceState state)
     {
-        var screenWidth = SystemParameters.PrimaryScreenWidth;
+        var screenWidth = GetPrimaryScreenWidthDip();
         var baseWidth = ResolveBaseSurfaceWidth(screenWidth);
         var maxWidth = Math.Max(185, screenWidth - _settings.SideMargin * 2);
         double surfaceWidth;
@@ -218,6 +256,13 @@ public partial class MainWindow : Window
         return (windowWidth, windowHeight, top);
     }
 
+    private double GetPrimaryScreenWidthDip()
+    {
+        var source = PresentationSource.FromVisual(this);
+        var transform = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+        return SystemParameters.PrimaryScreenWidth * transform.M11;
+    }
+
     private double ResolveBaseSurfaceWidth(double screenWidth)
     {
         return _settings.WidthPreset switch
@@ -234,7 +279,7 @@ public partial class MainWindow : Window
 
     private void AnimateWindow(double targetWidth, double targetHeight, double targetTop, int durationMs, int heightDelayMs)
     {
-        var screenWidth = SystemParameters.PrimaryScreenWidth;
+        var screenWidth = GetPrimaryScreenWidthDip();
         var targetLeft = (screenWidth - targetWidth) / 2.0;
 
         if (durationMs <= 0)
@@ -298,6 +343,24 @@ public partial class MainWindow : Window
         element.BeginAnimation(OpacityProperty, animation);
     }
 
+    private static void AnimateTranslate(TranslateTransform transform, double to, int durationMs, int delayMs)
+    {
+        if (durationMs <= 0)
+        {
+            transform.BeginAnimation(TranslateTransform.YProperty, null);
+            transform.Y = to;
+            return;
+        }
+
+        transform.BeginAnimation(
+            TranslateTransform.YProperty,
+            new DoubleAnimation(transform.Y, to, TimeSpan.FromMilliseconds(durationMs))
+            {
+                BeginTime = TimeSpan.FromMilliseconds(delayMs),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            });
+    }
+
     private void AnimateShadow(double blur, double opacity, bool immediate)
     {
         if (immediate)
@@ -312,13 +375,13 @@ public partial class MainWindow : Window
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
         SurfaceShadow.BeginAnimation(
             DropShadowEffect.BlurRadiusProperty,
-            new DoubleAnimation(SurfaceShadow.BlurRadius, blur, TimeSpan.FromMilliseconds(230))
+            new DoubleAnimation(SurfaceShadow.BlurRadius, blur, TimeSpan.FromMilliseconds(180))
             {
                 EasingFunction = ease
             });
         SurfaceShadow.BeginAnimation(
             DropShadowEffect.OpacityProperty,
-            new DoubleAnimation(SurfaceShadow.Opacity, opacity, TimeSpan.FromMilliseconds(230))
+            new DoubleAnimation(SurfaceShadow.Opacity, opacity, TimeSpan.FromMilliseconds(180))
             {
                 EasingFunction = ease
             });
@@ -375,7 +438,7 @@ public partial class MainWindow : Window
             ExpandedMediaTitle.Text = media.Title;
             ExpandedMediaSubtitle.Text = string.IsNullOrWhiteSpace(media.SourceApp)
                 ? media.Subtitle
-                : $"{media.Subtitle} · {media.SourceApp}";
+                : $"{media.Subtitle} \u00B7 {media.SourceApp}";
         }
         else
         {
@@ -388,7 +451,8 @@ public partial class MainWindow : Window
 
         ApplyArtwork(media.Artwork);
         MediaProgressBar.Value = media.Progress;
-        MediaProgressBar.Opacity = media.HasSession ? 1 : 0;
+        MediaProgressBar.Visibility = media.HasSession ? Visibility.Visible : Visibility.Collapsed;
+        MediaControlsPanel.Visibility = media.HasSession ? Visibility.Visible : Visibility.Collapsed;
         PreviousMediaButton.IsEnabled = media.HasSession;
         PlayPauseMediaButton.IsEnabled = media.HasSession;
         NextMediaButton.IsEnabled = media.HasSession;
@@ -465,9 +529,9 @@ public partial class MainWindow : Window
         ExpandedDateText.Text = now.ToString("M/d ddd");
 
         var stats = _statsService.Sample();
-        CompactStatsText.Text = $"CPU {stats.CpuPercent:0}  ·  RAM {stats.RamPercent:0}";
+        CompactStatsText.Text = $"CPU {stats.CpuPercent:0}%   RAM {stats.RamPercent:0}%";
         ExpandedSystemText.Text = $"CPU {stats.CpuPercent:0}%   RAM {stats.RamPercent:0}%";
-        ExpandedNetworkText.Text = $"↓ {stats.DownloadMbps:0.0}   ↑ {stats.UploadMbps:0.0} Mbps";
+        ExpandedNetworkText.Text = $"\u2193 {stats.DownloadMbps:0.0}   \u2191 {stats.UploadMbps:0.0} Mbps";
     }
 
     private void ThemeTimer_Tick(object? sender, EventArgs e)
@@ -571,10 +635,19 @@ public partial class MainWindow : Window
         DarkThemeMenuItem.IsChecked = _settings.Theme == AppThemeMode.Dark;
         LightThemeMenuItem.IsChecked = _settings.Theme == AppThemeMode.Light;
 
-        var baseWidth = ResolveBaseSurfaceWidth(SystemParameters.PrimaryScreenWidth);
+        UpdateCompactDensity();
+    }
+
+    private void UpdateCompactDensity()
+    {
+        var baseWidth = ResolveBaseSurfaceWidth(GetPrimaryScreenWidthDip());
+        var peek = _state == SurfaceState.Peek;
+
+        // Prefer removing detail to compressing every element. This keeps the
+        // compact surface readable instead of turning it into a tiny dashboard.
         CompactMediaText.Visibility = baseWidth >= 240 ? Visibility.Visible : Visibility.Collapsed;
-        MediaSubtitleText.Visibility = baseWidth >= 300 ? Visibility.Visible : Visibility.Collapsed;
-        CompactStatsText.Visibility = baseWidth >= 430 ? Visibility.Visible : Visibility.Collapsed;
+        MediaSubtitleText.Visibility = baseWidth >= (peek ? 300 : 360) ? Visibility.Visible : Visibility.Collapsed;
+        CompactStatsText.Visibility = baseWidth >= (peek ? 430 : 520) ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ApplyBackdropMaterial()

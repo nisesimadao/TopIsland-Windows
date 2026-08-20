@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 
 namespace TopIsland.Interop;
 
@@ -17,6 +18,13 @@ public sealed class OverlayWindowBehavior
     private readonly Window _window;
     private readonly Func<Point, bool> _containsSurface;
     private HwndSource? _source;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
 
     public OverlayWindowBehavior(Window window, Func<Point, bool> containsSurface)
     {
@@ -57,14 +65,22 @@ public sealed class OverlayWindowBehavior
         if (msg == WmNcHitTest)
         {
             var packed = lParam.ToInt64();
-            var screenX = unchecked((short)(packed & 0xFFFF));
-            var screenY = unchecked((short)((packed >> 16) & 0xFFFF));
-            var local = _window.PointFromScreen(new Point(screenX, screenY));
-
-            if (!_containsSurface(local))
+            var native = new NativePoint
             {
-                handled = true;
-                return new IntPtr(HtTransparent);
+                X = unchecked((short)(packed & 0xFFFF)),
+                Y = unchecked((short)((packed >> 16) & 0xFFFF))
+            };
+
+            if (ScreenToClient(hwnd, ref native))
+            {
+                var toDip = _source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+                var local = toDip.Transform(new Point(native.X, native.Y));
+
+                if (!_containsSurface(local))
+                {
+                    handled = true;
+                    return new IntPtr(HtTransparent);
+                }
             }
         }
 
@@ -76,6 +92,10 @@ public sealed class OverlayWindowBehavior
 
     private static IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr value)
         => IntPtr.Size == 8 ? SetWindowLongPtr64(hWnd, nIndex, value) : new IntPtr(SetWindowLong32(hWnd, nIndex, value.ToInt32()));
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ScreenToClient(IntPtr hWnd, ref NativePoint point);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
     private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
