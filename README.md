@@ -1,9 +1,9 @@
-<p align="center">
+﻿<p align="center">
   <img src="assets/banner.svg" alt="TopIsland" width="100%">
 </p>
 
 <p align="center">
-  <a href="README.ja.md">日本語</a> · English
+  <a href="README.ja.md">譌･譛ｬ隱・/a> ﾂｷ English
 </p>
 
 <p align="center">
@@ -16,7 +16,7 @@
 
 TopIsland is a top-center Windows surface that stays small until you need more information. It can float as a **Dynamic Island** or attach to the top edge as an inverse-radius **Notch**.
 
-The reference appearance is intentionally restrained: **one black surface, real data, contextual density, and no nested dashboard of rounded cards**.
+The reference appearance is intentionally restrained: **one surface, real data, contextual density, and no nested dashboard of rounded cards**.
 
 <p align="center">
   <img src="docs/screenshots/notch-expanded.png" alt="TopIsland expanded Notch with live Windows information" width="100%">
@@ -43,23 +43,23 @@ Notification permission is never requested automatically. If access is not alrea
 
 ## Interaction states
 
-- **Idle** — minimum information for the selected width
-- **Hover** — subtly wider/deeper
-- **Peek** — reveals selected lower-priority information without opening the full surface
-- **Expanded** — media/context row plus one lower information lane separated only by hairline dividers
+- **Idle** 窶・minimum information for the selected width
+- **Hover** 窶・subtly wider/deeper
+- **Peek** 窶・reveals selected lower-priority information without opening the full surface
+- **Expanded** 窶・media/context row plus one lower information lane separated only by hairline dividers
 
-Smaller widths remove information instead of shrinking every label. Full Width is allowed to reveal extra network/storage/activity status, but the media content itself still has a readable maximum width.
+Smaller widths remove information instead of shrinking every label. Expanded grows to a readable minimum width for its four regions; Full Width may reveal extra network/storage/activity status without stretching artwork, text, or progress controls.
 
 ## Screenshots
 
 <table>
   <tr>
-    <td align="center"><b>Dynamic Island · Expanded</b></td>
-    <td align="center"><b>Notch · Authentic</b></td>
+    <td align="center"><b>Dynamic Island ﾂｷ Expanded</b></td>
+    <td align="center"><b>Notch ﾂｷ Authentic</b></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/dynamic-expanded.png" alt="TopIsland Dynamic Island expanded"></td>
-    <td><img src="docs/screenshots/notch-authentic.png" alt="TopIsland Authentic Notch"></td>
+    <td><img src="docs/screenshots/notch-expanded.png" alt="TopIsland Notch expanded with Glass live blur"></td>
   </tr>
 </table>
 
@@ -82,17 +82,17 @@ All persistent choices use the same `%APPDATA%\TopIsland\settings.json` model.
 
 ## Multiple displays and DPI
 
-The WPF host is **PerMonitorV2**. TopIsland reads each monitor's physical display mode and Windows scale factor independently.
+The WPF host and the blur helper are **PerMonitorV2**. TopIsland reads each monitor's physical display mode and Windows scale factor independently.
 
 Current display modes:
 
-- **Follow active app** — follow the monitor containing the foreground window
+- **Follow active app** 窶・follow the monitor containing the foreground window
 - **Primary display**
-- **Fixed display** — pin TopIsland to a selected connected monitor
+- **Fixed display** 窶・pin TopIsland to a selected connected monitor
 
 A follow transition fades out briefly, moves/recalculates for the destination DPI, then fades back in instead of sliding through unrelated monitor coordinate spaces.
 
-The current development machine verifies a 3840×2160 display at 150% and a 2560×1440 display at 125%.
+The current development machine verifies a 3840ﾃ・160 display at 150% and a 2560ﾃ・440 display at 125%.
 
 ## Design baseline
 
@@ -116,11 +116,20 @@ The Notch geometry currently uses:
 | Closed | 6 | 14 |
 | Expanded | 19 | 24 |
 
-## Materials
+## Materials and live blur
 
-`Solid` black is the default. Mica / Acrylic / Glass / Material Copy remain optional appearances.
+`Solid` black remains the default, especially for Notch. `Mica` is the denser optional surface. `Acrylic` and `Glass` use a **real shape-clipped live background blur**. `Material You` is a separate Material 3 theme: the Windows accent becomes an HCT seed, `TonalSpot` generates the M3 semantic color roles, and the surface uses `surface` / `surfaceContainerLow` / `surfaceContainerHigh`, `onSurface`, `outlineVariant`, Primary and M3 state-layer colors. It does not use glass blur.
 
-Native DWM backdrop APIs were tested, but on the transparent shaped WPF host they paint rectangular window bounds around the custom geometry. The stable path therefore keeps the real Notch/Island shape intact. A compositor-backed shaped blur remains an isolated experiment rather than a dependency of the working overlay.
+TopIsland intentionally does not apply the native DWM backdrop directly to the transparent WPF window because DWM paints the rectangular host bounds around custom Notch/Island geometry. Instead, a small companion process named **TopIsland.BlurHost**:
+
+1. captures only the TopIsland screen rectangle behind the layered overlay,
+2. applies a Gaussian blur with SkiaSharp,
+3. clips the result to the exact Dynamic Island or inverse-radius Notch path with per-pixel alpha,
+4. places that blur surface directly below the WPF text/controls.
+
+This keeps the real geometry and click-through padding intact without a gray rectangle around it. The helper updates around 30 fps for normal surfaces and reduces the update rate for very large Full Width surfaces. On the current development PC, measured BlurHost usage is roughly **1% CPU and 40窶・0 MB working set** in representative Standard/Full Width cases.
+
+If BlurHost is unavailable, TopIsland automatically falls back to the denser non-blurred material tint instead of leaving the surface unreadable.
 
 ## Build
 
@@ -129,14 +138,29 @@ Requirements:
 - Windows 10 or newer
 - .NET 10 SDK
 
+Build both projects:
+
 ```powershell
 dotnet build TopIsland.slnx -c Release
 ```
 
-Publish Windows x64:
+Publish the complete Windows x64 layout, including BlurHost:
 
 ```powershell
-dotnet publish TopIsland/TopIsland.csproj -c Release -r win-x64 --self-contained false -o artifacts/publish
+powershell -ExecutionPolicy Bypass -File scripts/publish.ps1
+```
+
+The resulting layout is:
+
+```text
+artifacts/publish/
+  TopIsland.exe
+  ...
+  BlurHost/
+    TopIsland.BlurHost.exe
+    SkiaSharp.dll
+    libSkiaSharp.dll
+    ...
 ```
 
 Install the published build for the current user:
@@ -155,4 +179,4 @@ Local installation uses `%LOCALAPPDATA%\Programs\TopIsland` and creates a Start 
 
 ## Status
 
-TopIsland is still an interactive prototype, but its core overlay is functional: media/foreground context, richer live information, focus/download monitoring, Windows notification reading when permitted, geometry/motion, click-through and no-activate behavior, system-tray configuration, persistence, multi-display placement and PerMonitorV2 scaling are working.
+TopIsland is still an interactive prototype, but its core overlay is functional: media/foreground context, the four-region Expanded layout, Discord voice-state reading, focus/download monitoring, Windows notification reading when permitted, geometry/motion, click-through and no-activate behavior, system-tray configuration, persistence, multi-display placement, PerMonitorV2 scaling, Material You dynamic color, and shape-clipped live blur materials are working.

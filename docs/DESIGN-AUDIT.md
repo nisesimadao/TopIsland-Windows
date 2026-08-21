@@ -1,4 +1,4 @@
-# TopIsland design audit
+﻿# TopIsland design audit
 
 This document is the visual baseline for TopIsland. It exists to prevent future changes from drifting back into generic dashboard / glass-card UI.
 
@@ -73,7 +73,7 @@ Expanded Notch follows the BoringNotch relationship:
 - Standard: add subtitle/source when space allows
 - Idle >= 520 dip: allow compact CPU/RAM
 - Peek >= 430 dip: allow compact CPU/RAM
-- Expanded: artwork/app icon + primary information + one right-aligned system/time group
+- Expanded: four primary regions: Now Playing, System, Downloads, and Communication. The lower lane is reserved for Focus, Storage, Notifications, and Battery when available.
 
 Do not scale typography down to preserve content. Remove lower-priority content instead.
 
@@ -169,13 +169,31 @@ The overlay is an information surface, not the settings window.
 
 More information is allowed only when the surface has enough room and the data is real.
 
-- Expanded uses a primary context row and one secondary information lane, separated by a single horizontal hairline.
+- Expanded uses four primary regions on the main row, separated by vertical hairlines, plus one secondary information lane separated by a horizontal hairline.
 - Secondary groups use vertical hairlines and spacing, not rounded card containers.
-- Current lane modules are Focus, Downloads, Storage, Notifications, and Battery when present.
-- CPU/GPU/RAM and Network remain compact telemetry, not chart cards.
+- Current main-row modules are Now Playing, System, Downloads, and Communication. The lower lane contains Focus, Storage, Notifications, and Battery when present.
+- CPU/GPU/RAM are three small aligned metrics with restrained progress bars; Network stays compact telemetry. Do not turn them into separate dashboard cards.
 - Hide a module when the underlying capability is unavailable (for example, Battery on a desktop or Notifications without permission).
 - Never invent download progress, notification content, Discord voice state, battery state, or other live values.
+- Discord voice information must come from the live Discord desktop UI tree. Show channel/server/participants/mute-deafen state only when observed; do not fabricate call controls or participant state.
 - Full Width may reveal extra NET / SSD / notification activity, but smaller widths remove those details.
 - A future module must justify its space with current or actionable information; an empty placeholder is not a reason to add another container.
 - Windows notification permission must be opt-in. Do not request it automatically at startup.
 - Cross-monitor Follow active app transitions fade out, recalculate for the destination DPI, and fade in instead of visually sliding through unrelated monitor coordinate spaces.
+
+## Live blur materials
+
+Blur must support the surface geometry rather than redefine it.
+
+- `Solid` remains the reference material, especially for Notch.
+- `Mica` remains a denser non-live surface.
+- `Acrylic` and `Glass` may use the external BlurHost renderer.
+- `Material You` is not a glass material. It uses a Material 3 HCT/TonalSpot dynamic scheme and semantic surface/container/state-layer roles; BlurHost must stay off.
+- BlurHost captures only the TopIsland rectangle behind the layered windows; it must never capture the full desktop unnecessarily.
+- The blur output uses per-pixel alpha and the same Dynamic Island / inverse-radius Notch geometry as the WPF hit-test surface.
+- Never accept a rectangular DWM/Acrylic backdrop leaking outside the shape.
+- Acrylic/Glass differences should come primarily from blur radius and tint density. Material You instead follows Material 3 semantic color roles and state layers. Avoid decorative glass cards and arbitrary accent washes.
+- Text/control contrast is owned by the WPF foreground layer; the background blur must remain subordinate.
+- If BlurHost is unavailable, use the readable static fallback tint instead of partially broken transparency.
+- Normal surfaces target roughly 30 fps; very large surfaces may reduce the blur refresh rate to limit CPU use.
+- BlurHost must be click-through/no-activate and remain directly below the TopIsland foreground window.

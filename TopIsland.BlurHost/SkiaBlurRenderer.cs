@@ -1,0 +1,342 @@
+using SkiaSharp;
+using System.Runtime.InteropServices;
+
+namespace TopIsland.BlurHost;
+
+internal readonly record struct BlurFrameOptions(
+    float BlurSigma,
+    byte TintAlpha,
+    byte TintR,
+    byte TintG,
+    byte TintB);
+
+internal sealed class SkiaBlurRenderer : IDisposable
+{
+    private const uint SrcCopy = 0x00CC0020;
+    private const uint DibRgbColors = 0;
+    private const uint BiRgb = 0;
+    private const uint UlwAlpha = 0x00000002;
+    private const byte AcSrcOver = 0x00;
+    private const byte AcSrcAlpha = 0x01;
+
+    private readonly IntPtr _hostHwnd;
+
+    private IntPtr _captureDc;
+    private IntPtr _captureBitmap;
+    private IntPtr _captureOld;
+    private IntPtr _captureBits;
+
+    private IntPtr _outputDc;
+    private IntPtr _outputBitmap;
+    private IntPtr _outputOld;
+    private IntPtr _outputBits;
+
+    private int _width;
+    private int _height;
+    private bool _disposed;
+
+    public SkiaBlurRenderer(IntPtr hostHwnd)
+    {
+        _hostHwnd = hostHwnd;
+    }
+
+    public bool Render(
+        int screenX,
+        int screenY,
+        int width,
+        int height,
+        double scale,
+        int style,
+        bool expanded,
+        BlurFrameOptions options)
+    {
+        if (_disposed || width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        EnsureBuffers(width, height);
+
+        var screenDc = GetDC(IntPtr.Zero);
+        if (screenDc == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            // SRCCOPY excludes the layered TopIsland and BlurHost windows, so this
+            // buffer is the real desktop/application content underneath the surface.
+            if (!BitBlt(_captureDc, 0, 0, width, height, screenDc, screenX, screenY, SrcCopy))
+            {
+                return false;
+            }
+
+            var sourceInfo = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque);
+            var outputInfo = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
+
+            using var source = new SKBitmap();
+            using var output = new SKBitmap();
+            if (!source.InstallPixels(sourceInfo, _captureBits, width * 4) ||
+                !output.InstallPixels(outputInfo, _outputBits, width * 4))
+            {
+                return false;
+            }
+
+            using (var canvas = new SKCanvas(output))
+            using (var shape = CreateShapePath(width, height, scale, style, expanded))
+            {
+                canvas.Clear(SKColors.Transparent);
+                canvas.Save();
+                canvas.ClipPath(shape, SKClipOperation.Intersect, antialias: true);
+
+                using var blur = SKImageFilter.CreateBlur(
+                    Math.Max(0.1f, options.BlurSigma),
+                    Math.Max(0.1f, options.BlurSigma),
+                    SKShaderTileMode.Clamp);
+                using var blurPaint = new SKPaint
+                {
+                    IsAntialias = true,
+                    ImageFilter = blur
+                };
+                canvas.DrawBitmap(source, 0, 0, SKSamplingOptions.Default, blurPaint);
+
+                if (options.TintAlpha > 0)
+                {
+                    using var tintPaint = new SKPaint
+                    {
+                        IsAntialias = true,
+                        Color = new SKColor(options.TintR, options.TintG, options.TintB, options.TintAlpha)
+                    };
+                    canvas.DrawRect(0, 0, width, height, tintPaint);
+                }
+
+                canvas.Restore();
+                canvas.Flush();
+            }
+
+            var dst = new NativePoint(screenX, screenY);
+            var size = new NativeSize(width, height);
+            var src = new NativePoint(0, 0);
+            var blend = new BlendFunction
+            {
+                BlendOp = AcSrcOver,
+                BlendFlags = 0,
+                SourceConstantAlpha = 255,
+                AlphaFormat = AcSrcAlpha
+            };
+
+            return UpdateLayeredWindow(
+                _hostHwnd,
+                screenDc,
+                ref dst,
+                ref size,
+                _outputDc,
+                ref src,
+                0,
+                ref blend,
+                UlwAlpha);
+        }
+        finally
+        {
+            ReleaseDC(IntPtr.Zero, screenDc);
+        }
+    }
+
+    private static SKPath CreateShapePath(int width, int height, double scale, int style, bool expanded)
+    {
+        using var builder = new SKPathBuilder();
+        var pad = (float)(16 * scale);
+
+        if (style != 1)
+        {
+            var left = pad;
+            var top = pad;
+            var right = Math.Max(left + 1, width - pad);
+            var bottom = Math.Max(top + 1, height - pad);
+            var surfaceHeight = bottom - top;
+            var radius = expanded
+                ? Math.Min((float)(28 * scale), surfaceHeight / 2f)
+                : surfaceHeight / 2f;
+            builder.AddRoundRect(
+                new SKRoundRect(new SKRect(left, top, right, bottom), radius, radius),
+                SKPathDirection.Clockwise);
+            return builder.Detach();
+        }
+
+        var notchLeft = pad;
+        var notchRight = Math.Max(notchLeft + 1, width - pad);
+        var notchTop = 0f;
+        var notchBottom = Math.Max(1f, height - pad);
+        var topRadius = (float)((expanded ? 19.0 : 6.0) * scale);
+        var bottomRadius = (float)((expanded ? 24.0 : 14.0) * scale);
+        bottomRadius = Math.Min(bottomRadius, Math.Max(1f, (notchRight - notchLeft) / 4f));
+
+        builder.MoveTo(notchLeft, notchTop);
+        builder.QuadTo(notchLeft + topRadius, notchTop, notchLeft + topRadius, notchTop + topRadius);
+        builder.LineTo(notchLeft + topRadius, notchBottom - bottomRadius);
+        builder.QuadTo(notchLeft + topRadius, notchBottom, notchLeft + topRadius + bottomRadius, notchBottom);
+        builder.LineTo(notchRight - topRadius - bottomRadius, notchBottom);
+        builder.QuadTo(notchRight - topRadius, notchBottom, notchRight - topRadius, notchBottom - bottomRadius);
+        builder.LineTo(notchRight - topRadius, notchTop + topRadius);
+        builder.QuadTo(notchRight - topRadius, notchTop, notchRight, notchTop);
+        builder.LineTo(notchLeft, notchTop);
+        builder.Close();
+        return builder.Detach();
+    }
+
+    private void EnsureBuffers(int width, int height)
+    {
+        if (_width == width && _height == height && _captureDc != IntPtr.Zero && _outputDc != IntPtr.Zero)
+        {
+            return;
+        }
+
+        ReleaseBuffers();
+
+        var screenDc = GetDC(IntPtr.Zero);
+        if (screenDc == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("GetDC failed while creating blur buffers.");
+        }
+
+        try
+        {
+            _captureDc = CreateCompatibleDC(screenDc);
+            _outputDc = CreateCompatibleDC(screenDc);
+            if (_captureDc == IntPtr.Zero || _outputDc == IntPtr.Zero)
+            {
+                throw new InvalidOperationException("CreateCompatibleDC failed.");
+            }
+
+            _captureBitmap = CreateTopDownDib(screenDc, width, height, out _captureBits);
+            _outputBitmap = CreateTopDownDib(screenDc, width, height, out _outputBits);
+            if (_captureBitmap == IntPtr.Zero || _outputBitmap == IntPtr.Zero ||
+                _captureBits == IntPtr.Zero || _outputBits == IntPtr.Zero)
+            {
+                throw new InvalidOperationException("CreateDIBSection failed.");
+            }
+
+            _captureOld = SelectObject(_captureDc, _captureBitmap);
+            _outputOld = SelectObject(_outputDc, _outputBitmap);
+            _width = width;
+            _height = height;
+        }
+        finally
+        {
+            ReleaseDC(IntPtr.Zero, screenDc);
+        }
+    }
+
+    private static IntPtr CreateTopDownDib(IntPtr dc, int width, int height, out IntPtr bits)
+    {
+        var info = new BitmapInfo
+        {
+            Header = new BitmapInfoHeader
+            {
+                Size = (uint)Marshal.SizeOf<BitmapInfoHeader>(),
+                Width = width,
+                Height = -height,
+                Planes = 1,
+                BitCount = 32,
+                Compression = BiRgb,
+                SizeImage = (uint)checked(width * height * 4)
+            }
+        };
+        return CreateDIBSection(dc, ref info, DibRgbColors, out bits, IntPtr.Zero, 0);
+    }
+
+    private void ReleaseBuffers()
+    {
+        if (_captureDc != IntPtr.Zero && _captureOld != IntPtr.Zero)
+        {
+            SelectObject(_captureDc, _captureOld);
+        }
+        if (_outputDc != IntPtr.Zero && _outputOld != IntPtr.Zero)
+        {
+            SelectObject(_outputDc, _outputOld);
+        }
+        if (_captureBitmap != IntPtr.Zero) DeleteObject(_captureBitmap);
+        if (_outputBitmap != IntPtr.Zero) DeleteObject(_outputBitmap);
+        if (_captureDc != IntPtr.Zero) DeleteDC(_captureDc);
+        if (_outputDc != IntPtr.Zero) DeleteDC(_outputDc);
+
+        _captureDc = _captureBitmap = _captureOld = _captureBits = IntPtr.Zero;
+        _outputDc = _outputBitmap = _outputOld = _outputBits = IntPtr.Zero;
+        _width = _height = 0;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        ReleaseBuffers();
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BitmapInfoHeader
+    {
+        public uint Size;
+        public int Width;
+        public int Height;
+        public ushort Planes;
+        public ushort BitCount;
+        public uint Compression;
+        public uint SizeImage;
+        public int XPelsPerMeter;
+        public int YPelsPerMeter;
+        public uint ClrUsed;
+        public uint ClrImportant;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BitmapInfo
+    {
+        public BitmapInfoHeader Header;
+        public uint Colors;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public NativePoint(int x, int y) { X = x; Y = y; }
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeSize
+    {
+        public NativeSize(int cx, int cy) { Cx = cx; Cy = cy; }
+        public int Cx;
+        public int Cy;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct BlendFunction
+    {
+        public byte BlendOp;
+        public byte BlendFlags;
+        public byte SourceConstantAlpha;
+        public byte AlphaFormat;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDC(IntPtr hwnd);
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(IntPtr hwnd, IntPtr dc);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr hdcDst, ref NativePoint dst, ref NativeSize size, IntPtr hdcSrc, ref NativePoint src, uint colorKey, ref BlendFunction blend, uint flags);
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateCompatibleDC(IntPtr dc);
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteDC(IntPtr dc);
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateDIBSection(IntPtr dc, ref BitmapInfo info, uint usage, out IntPtr bits, IntPtr section, uint offset);
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr SelectObject(IntPtr dc, IntPtr obj);
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr obj);
+    [DllImport("gdi32.dll")]
+    private static extern bool BitBlt(IntPtr destDc, int x, int y, int width, int height, IntPtr sourceDc, int sourceX, int sourceY, uint rasterOp);
+}

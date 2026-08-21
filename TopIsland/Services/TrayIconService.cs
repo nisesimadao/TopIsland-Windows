@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using Forms = System.Windows.Forms;
 using TopIsland.Models;
 
@@ -67,7 +67,7 @@ public sealed class TrayIconService : IDisposable
             CheckedItem("Mica", settings.Material == SurfaceMaterial.Mica, () => _window.SetMaterial(SurfaceMaterial.Mica)),
             CheckedItem("Acrylic", settings.Material == SurfaceMaterial.Acrylic, () => _window.SetMaterial(SurfaceMaterial.Acrylic)),
             CheckedItem("Glass", settings.Material == SurfaceMaterial.Glass, () => _window.SetMaterial(SurfaceMaterial.Glass)),
-            CheckedItem("Material Copy", settings.Material == SurfaceMaterial.MaterialCopy, () => _window.SetMaterial(SurfaceMaterial.MaterialCopy))));
+            CheckedItem("Material You", settings.Material == SurfaceMaterial.MaterialCopy, () => _window.SetMaterial(SurfaceMaterial.MaterialCopy))));
 
         _menu.Items.Add(Submenu("Theme",
             CheckedItem("System", settings.Theme == AppThemeMode.System, () => _window.SetTheme(AppThemeMode.System)),
@@ -89,7 +89,7 @@ public sealed class TrayIconService : IDisposable
         for (var i = 0; i < monitors.Count; i++)
         {
             var monitor = monitors[i];
-            var label = $"Display {i + 1} · {monitor.DisplayLabel}" + (monitor.IsPrimary ? " · Primary" : string.Empty);
+            var label = $"Display {i + 1} ﾂｷ {monitor.DisplayLabel}" + (monitor.IsPrimary ? " ﾂｷ Primary" : string.Empty);
             displayMenu.DropDownItems.Add(CheckedItem(
                 label,
                 settings.MonitorMode == MonitorMode.Fixed && string.Equals(settings.MonitorDeviceName, monitor.DeviceName, StringComparison.OrdinalIgnoreCase),

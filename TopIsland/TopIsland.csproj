@@ -20,4 +20,8 @@
     <Resource Include="Assets\TopIsland.png" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Material3.Core" Version="0.8.0" />
+  </ItemGroup>
+
 </Project>

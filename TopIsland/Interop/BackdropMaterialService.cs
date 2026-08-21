@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using TopIsland.Models;
@@ -41,7 +41,7 @@ public sealed class BackdropMaterialService
             SurfaceMaterial.Mica => DwmSystemBackdropType.MainWindow,
             SurfaceMaterial.Acrylic => DwmSystemBackdropType.TransientWindow,
             SurfaceMaterial.Glass => DwmSystemBackdropType.TransientWindow,
-            SurfaceMaterial.MaterialCopy => DwmSystemBackdropType.TabbedWindow,
+            SurfaceMaterial.MaterialCopy => DwmSystemBackdropType.None,
             _ => DwmSystemBackdropType.None
         };
 

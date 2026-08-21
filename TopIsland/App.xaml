@@ -12,6 +12,14 @@
         <SolidColorBrush x:Key="ControlHoverBrush" Color="#24FFFFFF"/>
         <SolidColorBrush x:Key="ControlPressedBrush" Color="#36FFFFFF"/>
         <SolidColorBrush x:Key="AccentBrush" Color="#FFF5F5F7"/>
+        <SolidColorBrush x:Key="PrimaryContainerBrush" Color="#00000000"/>
+        <SolidColorBrush x:Key="OnPrimaryContainerBrush" Color="#FFFFFFFF"/>
+        <SolidColorBrush x:Key="SecondaryContainerBrush" Color="#00000000"/>
+        <SolidColorBrush x:Key="OnSecondaryContainerBrush" Color="#FFFFFFFF"/>
+        <SolidColorBrush x:Key="SurfaceContainerLowBrush" Color="#FF000000"/>
+        <SolidColorBrush x:Key="SurfaceContainerHighBrush" Color="#FF000000"/>
+        <SolidColorBrush x:Key="OutlineBrush" Color="#FF636366"/>
+        <SolidColorBrush x:Key="ErrorBrush" Color="#FFFF453A"/>
 
         <Style x:Key="MediaProgressStyle" TargetType="ProgressBar">
             <Setter Property="Height" Value="5"/>

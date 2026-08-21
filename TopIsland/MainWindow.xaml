@@ -22,6 +22,10 @@
         <Geometry x:Key="NextGeometry">M5,4 L15,10 L5,16 Z M16,4 H18 V16 H16 Z</Geometry>
         <Geometry x:Key="MediaFallbackGeometry">M6,3 H16 V5 H8 V13.2 C8,15.3 6.5,17 4.5,17 C2.6,17 1,15.8 1,14.2 C1,12.4 2.8,11 5,11 C5.4,11 5.7,11 6,11.1 Z</Geometry>
         <Geometry x:Key="ActiveAppFallbackGeometry">M2,3 H18 V17 H2 Z M4,5 V15 H16 V5 Z M5,6 H8 V8 H5 Z</Geometry>
+        <Geometry x:Key="MicGeometry">M10,2 C7.8,2 6,3.8 6,6 V10 C6,12.2 7.8,14 10,14 C12.2,14 14,12.2 14,10 V6 C14,3.8 12.2,2 10,2 Z M3.5,9.5 C3.5,13.1 6.3,16 10,16 C13.7,16 16.5,13.1 16.5,9.5 H14.8 C14.8,12.2 12.7,14.3 10,14.3 C7.3,14.3 5.2,12.2 5.2,9.5 Z M9,16 H11 V19 H9 Z</Geometry>
+        <Geometry x:Key="HeadphonesGeometry">M3,11 C3,6.6 6.1,3 10,3 C13.9,3 17,6.6 17,11 V16 H13 V10 H15.3 C14.9,7 12.8,4.8 10,4.8 C7.2,4.8 5.1,7 4.7,10 H7 V16 H3 Z</Geometry>
+        <Geometry x:Key="HangupGeometry">M3,12 C5.1,10.3 7.4,9.5 10,9.5 C12.6,9.5 14.9,10.3 17,12 L15.2,15 L12.6,13.8 L13.1,11.9 C11.1,11.2 8.9,11.2 6.9,11.9 L7.4,13.8 L4.8,15 Z</Geometry>
+        <Geometry x:Key="ChatGeometry">M2,3 H18 V14 H9 L5,18 V14 H2 Z M5,6 H15 V7.5 H5 Z M5,9 H13 V10.5 H5 Z</Geometry>
     </Window.Resources>
 
     <Grid x:Name="Root"
@@ -46,7 +50,7 @@
                     <MenuItem x:Name="MicaMaterialMenuItem" Header="Mica" IsCheckable="True" Click="SetMicaMaterial_Click"/>
                     <MenuItem x:Name="AcrylicMaterialMenuItem" Header="Acrylic" IsCheckable="True" Click="SetAcrylicMaterial_Click"/>
                     <MenuItem x:Name="GlassMaterialMenuItem" Header="Glass" IsCheckable="True" Click="SetGlassMaterial_Click"/>
-                    <MenuItem x:Name="MaterialCopyMenuItem" Header="Material Copy" IsCheckable="True" Click="SetMaterialCopy_Click"/>
+                    <MenuItem x:Name="MaterialCopyMenuItem" Header="Material You" IsCheckable="True" Click="SetMaterialCopy_Click"/>
                 </MenuItem>
                 <MenuItem Header="Theme">
                     <MenuItem x:Name="SystemThemeMenuItem" Header="System" IsCheckable="True" Click="SetSystemTheme_Click"/>
@@ -137,50 +141,132 @@
 
             <Grid x:Name="ExpandedPanel" Visibility="Hidden" Opacity="0" Margin="40">
                 <Grid.RenderTransform><TranslateTransform x:Name="ExpandedTranslate" Y="-4"/></Grid.RenderTransform>
-                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="17"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="150"/>
+                    <RowDefinition Height="17"/>
+                    <RowDefinition Height="58"/>
+                </Grid.RowDefinitions>
+
+                <Border x:Name="MaterialYouTopContainer"
+                        Grid.Row="0"
+                        Background="{DynamicResource SurfaceContainerLowBrush}"
+                        CornerRadius="22"
+                        Margin="-14,-10,-14,-6"
+                        Visibility="Collapsed"
+                        IsHitTestVisible="False"/>
+                <Border x:Name="MaterialYouBottomContainer"
+                        Grid.Row="2"
+                        Background="{DynamicResource SurfaceContainerHighBrush}"
+                        CornerRadius="20"
+                        Margin="-14,-5,-14,-5"
+                        Visibility="Collapsed"
+                        IsHitTestVisible="False"/>
 
                 <Grid Grid.Row="0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <Border x:Name="ExpandedArtworkBorder" Grid.Column="0" Width="90" Height="90" CornerRadius="13" Background="#18FFFFFF" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <Viewbox Width="28" Height="28"><Path x:Name="ExpandedArtworkGlyphPath" Data="{StaticResource MediaFallbackGeometry}" Fill="{DynamicResource SecondaryTextBrush}"/></Viewbox>
-                    </Border>
-                    <Grid Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left" MaxWidth="520" Margin="0,0,24,0">
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <TextBlock x:Name="ExpandedMediaTitle" Grid.Row="0" Text="No media" FontSize="16" FontWeight="SemiBold" LineHeight="20" TextTrimming="CharacterEllipsis"/>
-                        <TextBlock x:Name="ExpandedMediaSubtitle" Grid.Row="1" FontSize="11.5" LineHeight="15" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis"/>
-                        <ProgressBar x:Name="MediaProgressBar" Grid.Row="2" Style="{StaticResource MediaProgressStyle}" Visibility="Collapsed" Minimum="0" Maximum="1" Value="0" Margin="0,10,0,0" IsHitTestVisible="False"/>
-                        <StackPanel x:Name="MediaControlsPanel" Grid.Row="3" Orientation="Horizontal" Visibility="Collapsed" Margin="0,7,0,0">
-                            <Button x:Name="PreviousMediaButton" Style="{StaticResource IconButtonStyle}" IsEnabled="False" Click="PreviousMediaButton_Click"><Viewbox Width="15" Height="15"><Path Data="{StaticResource PreviousGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Button>
-                            <Button x:Name="PlayPauseMediaButton" Style="{StaticResource IconButtonStyle}" Width="40" Height="40" Margin="6,0" IsEnabled="False" Click="PlayPauseMediaButton_Click"><Grid Width="18" Height="18"><Viewbox x:Name="PlayIconViewbox" Width="18" Height="18"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox><Viewbox x:Name="PauseIconViewbox" Width="18" Height="18" Visibility="Collapsed"><Path Data="{StaticResource PauseGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Grid></Button>
-                            <Button x:Name="NextMediaButton" Style="{StaticResource IconButtonStyle}" IsEnabled="False" Click="NextMediaButton_Click"><Viewbox Width="15" Height="15"><Path Data="{StaticResource NextGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Button>
-                        </StackPanel>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.45*" MinWidth="360"/>
+                        <ColumnDefinition Width="1"/>
+                        <ColumnDefinition Width="0.9*" MinWidth="190"/>
+                        <ColumnDefinition Width="1"/>
+                        <ColumnDefinition Width="0.95*" MinWidth="200"/>
+                        <ColumnDefinition Width="1"/>
+                        <ColumnDefinition Width="1.15*" MinWidth="250"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Now Playing -->
+                    <Grid Grid.Column="0" Margin="0,0,18,0" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Border x:Name="ExpandedArtworkBorder" Grid.Column="0" Width="104" Height="104" CornerRadius="14" Background="#18FFFFFF" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <Viewbox Width="30" Height="30"><Path x:Name="ExpandedArtworkGlyphPath" Data="{StaticResource MediaFallbackGeometry}" Fill="{DynamicResource SecondaryTextBrush}"/></Viewbox>
+                        </Border>
+                        <Grid Grid.Column="1" VerticalAlignment="Center" MaxWidth="360">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="NOW PLAYING" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="ExpandedMediaTitle" Grid.Row="1" Text="No media" FontSize="17" FontWeight="SemiBold" LineHeight="21" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="ExpandedMediaSubtitle" Grid.Row="2" FontSize="11.5" LineHeight="15" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis"/>
+                            <ProgressBar x:Name="MediaProgressBar" Grid.Row="3" Style="{StaticResource MediaProgressStyle}" Visibility="Collapsed" Minimum="0" Maximum="1" Value="0" Margin="0,10,0,0" IsHitTestVisible="False"/>
+                            <StackPanel x:Name="MediaControlsPanel" Grid.Row="4" Orientation="Horizontal" Visibility="Collapsed" Margin="0,6,0,0">
+                                <Button x:Name="PreviousMediaButton" Style="{StaticResource IconButtonStyle}" IsEnabled="False" Click="PreviousMediaButton_Click"><Viewbox Width="15" Height="15"><Path Data="{StaticResource PreviousGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Button>
+                                <Button x:Name="PlayPauseMediaButton" Style="{StaticResource IconButtonStyle}" Width="40" Height="40" Margin="6,0" IsEnabled="False" Click="PlayPauseMediaButton_Click"><Grid Width="18" Height="18"><Viewbox x:Name="PlayIconViewbox" Width="18" Height="18"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox><Viewbox x:Name="PauseIconViewbox" Width="18" Height="18" Visibility="Collapsed"><Path Data="{StaticResource PauseGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Grid></Button>
+                                <Button x:Name="NextMediaButton" Style="{StaticResource IconButtonStyle}" IsEnabled="False" Click="NextMediaButton_Click"><Viewbox Width="15" Height="15"><Path Data="{StaticResource NextGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Button>
+                            </StackPanel>
+                        </Grid>
                     </Grid>
-                    <Grid Grid.Column="2" Width="190" VerticalAlignment="Center" HorizontalAlignment="Right">
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="12"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <TextBlock x:Name="ExpandedClockText" Grid.Row="0" Text="21:00" FontSize="18" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" LineHeight="22" HorizontalAlignment="Right"/>
-                        <TextBlock x:Name="ExpandedDateText" Grid.Row="1" Text="8/20 Thu" FontSize="10" LineHeight="13" Foreground="{DynamicResource SecondaryTextBrush}" Typography.NumeralAlignment="Tabular" HorizontalAlignment="Right"/>
-                        <TextBlock x:Name="ExpandedSystemText" Grid.Row="3" Text="CPU 0%   GPU 0%   RAM 0%" FontSize="10" LineHeight="13" Typography.NumeralAlignment="Tabular" HorizontalAlignment="Right"/>
-                        <TextBlock x:Name="ExpandedNetworkText" Grid.Row="4" Text="&#x2193; 0.0 Mbps   &#x2191; 0.0 Mbps" FontSize="10" LineHeight="13" Foreground="{DynamicResource SecondaryTextBrush}" Typography.NumeralAlignment="Tabular" HorizontalAlignment="Right" Margin="0,2,0,0"/>
+
+                    <Border Grid.Column="1" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,4"/>
+
+                    <!-- System -->
+                    <Grid Grid.Column="2" Margin="18,0" VerticalAlignment="Center">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="8"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="SYSTEM" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}"/>
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,3,0,0">
+                            <TextBlock x:Name="ExpandedClockText" Text="21:00" FontSize="25" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular"/>
+                            <TextBlock x:Name="ExpandedDateText" Text="8/20 Thu" FontSize="9.5" Foreground="{DynamicResource SecondaryTextBrush}" Margin="9,0,0,3" VerticalAlignment="Bottom"/>
+                        </StackPanel>
+                        <Grid Grid.Row="3">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0"><TextBlock Text="CPU" FontSize="8.5" Foreground="{DynamicResource TertiaryTextBrush}"/><TextBlock x:Name="CpuValueText" Text="0%" FontSize="11" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular"/><ProgressBar x:Name="CpuProgressBar" Style="{StaticResource MediaProgressStyle}" Height="3" Minimum="0" Maximum="100" Margin="0,4,0,0"/></StackPanel>
+                            <StackPanel Grid.Column="1" Margin="4,0"><TextBlock Text="GPU" FontSize="8.5" Foreground="{DynamicResource TertiaryTextBrush}"/><TextBlock x:Name="GpuValueText" Text="0%" FontSize="11" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular"/><ProgressBar x:Name="GpuProgressBar" Style="{StaticResource MediaProgressStyle}" Height="3" Minimum="0" Maximum="100" Margin="0,4,0,0"/></StackPanel>
+                            <StackPanel Grid.Column="2" Margin="8,0,0,0"><TextBlock Text="RAM" FontSize="8.5" Foreground="{DynamicResource TertiaryTextBrush}"/><TextBlock x:Name="RamValueText" Text="0%" FontSize="11" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular"/><ProgressBar x:Name="RamProgressBar" Style="{StaticResource MediaProgressStyle}" Height="3" Minimum="0" Maximum="100" Margin="0,4,0,0"/></StackPanel>
+                        </Grid>
+                        <TextBlock x:Name="ExpandedSystemText" Grid.Row="4" Visibility="Collapsed"/>
+                        <TextBlock x:Name="ExpandedNetworkText" Grid.Row="5" Text="&#x2193; 0.0   &#x2191; 0.0 Mbps" FontSize="9.5" Foreground="{DynamicResource SecondaryTextBrush}" Typography.NumeralAlignment="Tabular" Margin="0,8,0,0"/>
+                    </Grid>
+
+                    <Border Grid.Column="3" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,4"/>
+
+                    <!-- Downloads -->
+                    <Grid Grid.Column="4" Margin="18,0" VerticalAlignment="Center">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="DOWNLOADS" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}"/>
+                        <TextBlock x:Name="DownloadPrimaryText" Grid.Row="1" Text="No active downloads" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,7,0,0"/>
+                        <TextBlock x:Name="DownloadDetailText" Grid.Row="2" FontSize="9.5" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" Typography.NumeralAlignment="Tabular" Margin="0,3,0,0"/>
+                        <ProgressBar x:Name="DownloadActivityProgressBar" Grid.Row="3" Style="{StaticResource MediaProgressStyle}" IsIndeterminate="True" Visibility="Collapsed" Height="4" Margin="0,10,0,0"/>
+                    </Grid>
+
+                    <Border Grid.Column="5" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,4"/>
+
+                    <!-- Communication / Discord -->
+                    <Grid x:Name="DiscordVoiceGroup" Grid.Column="6" Margin="18,0,0,0" VerticalAlignment="Center">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="COMMUNICATION" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}"/>
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,7,0,0">
+                            <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource SecondaryContainerBrush}" Margin="0,0,10,0">
+                                <Viewbox Width="17" Height="17"><Path Data="{StaticResource ChatGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="DiscordVoiceStateText" Text="Discord" FontSize="12" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="DiscordVoiceChannelText" Text="Not in voice" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" MaxWidth="180"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <TextBlock x:Name="DiscordVoiceDetailText" Grid.Row="2" Text="Discord is not connected" FontSize="9.5" Foreground="{DynamicResource TertiaryTextBrush}" TextTrimming="CharacterEllipsis" Margin="0,7,0,0"/>
+                        <StackPanel x:Name="DiscordVoiceStatusStrip" Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0" Visibility="Collapsed">
+                            <Viewbox Width="12" Height="12" Margin="0,0,6,0"><Path Data="{StaticResource MicGeometry}" Fill="{DynamicResource SecondaryTextBrush}"/></Viewbox>
+                            <TextBlock x:Name="DiscordVoiceStatusText" Text="Mic live ? Audio on" FontSize="9.5" Foreground="{DynamicResource SecondaryTextBrush}"/>
+                        </StackPanel>
                     </Grid>
                 </Grid>
 
                 <Border Grid.Row="1" Height="1" Background="{DynamicResource DividerBrush}" VerticalAlignment="Center"/>
 
-                <Grid Grid.Row="2" Height="52">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="145"/><ColumnDefinition Width="1"/><ColumnDefinition Width="*" MinWidth="210"/><ColumnDefinition Width="1"/><ColumnDefinition Width="170"/><ColumnDefinition Width="1"/><ColumnDefinition x:Name="NotificationColumn" Width="0"/><ColumnDefinition Width="1"/><ColumnDefinition x:Name="BatteryColumn" Width="0"/></Grid.ColumnDefinitions>
+                <Grid Grid.Row="2" Height="58">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="145"/><ColumnDefinition Width="1"/>
+                        <ColumnDefinition Width="190"/><ColumnDefinition Width="1"/>
+                        <ColumnDefinition x:Name="NotificationColumn" Width="*"/><ColumnDefinition Width="1"/>
+                        <ColumnDefinition x:Name="BatteryColumn" Width="0"/>
+                    </Grid.ColumnDefinitions>
                     <Grid Grid.Column="0" VerticalAlignment="Center">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center"><TextBlock Text="FOCUS" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}"/><TextBlock x:Name="FocusTimerText" Text="25:00" FontSize="14" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" Margin="0,2,0,0"/></StackPanel>
                         <Button x:Name="FocusToggleButton" Grid.Column="1" Style="{StaticResource IconButtonStyle}" Width="30" Height="30" Click="FocusToggleButton_Click"><Grid Width="14" Height="14"><Viewbox x:Name="FocusPlayIconViewbox" Width="14" Height="14"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox><Viewbox x:Name="FocusPauseIconViewbox" Width="14" Height="14" Visibility="Collapsed"><Path Data="{StaticResource PauseGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Grid></Button>
                     </Grid>
                     <Border Grid.Column="1" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,4"/>
-                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="16,0"><TextBlock Text="DOWNLOADS" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}"/><TextBlock x:Name="DownloadPrimaryText" Text="No active downloads" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/><TextBlock x:Name="DownloadDetailText" FontSize="9.5" Foreground="{DynamicResource SecondaryTextBrush}" Typography.NumeralAlignment="Tabular" Margin="0,1,0,0"/></StackPanel>
-                    <Border Grid.Column="3" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,4"/>
-                    <StackPanel Grid.Column="4" VerticalAlignment="Center" Margin="16,0"><TextBlock Text="STORAGE" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}"/><TextBlock x:Name="StorageText" Text="-- free" FontSize="11" Typography.NumeralAlignment="Tabular" Margin="0,2,0,0"/><ProgressBar x:Name="StorageProgressBar" Style="{StaticResource MediaProgressStyle}" Minimum="0" Maximum="1" Value="0" Height="4" Margin="0,5,0,0" IsHitTestVisible="False"/></StackPanel>
-                    <Border x:Name="NotificationSeparator" Grid.Column="5" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,4" Visibility="Collapsed"/>
-                    <StackPanel x:Name="NotificationStripGroup" Grid.Column="6" VerticalAlignment="Center" Margin="16,0" Visibility="Collapsed"><TextBlock Text="NOTIFICATIONS" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}"/><TextBlock x:Name="NotificationPrimaryText" Text="No notifications" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/><TextBlock x:Name="NotificationDetailText" FontSize="9.5" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/></StackPanel>
-                    <Border x:Name="BatterySeparator" Grid.Column="7" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,4" Visibility="Collapsed"/>
-                    <StackPanel x:Name="BatteryStripGroup" Grid.Column="8" VerticalAlignment="Center" Margin="16,0,0,0" Visibility="Collapsed"><TextBlock Text="BATTERY" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}"/><TextBlock x:Name="BatteryText" Text="--" FontSize="11" Typography.NumeralAlignment="Tabular" Margin="0,2,0,0"/><TextBlock x:Name="BatteryStateText" FontSize="9.5" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,1,0,0"/></StackPanel>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="16,0"><TextBlock Text="STORAGE" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}"/><TextBlock x:Name="StorageText" Text="-- free" FontSize="11" Typography.NumeralAlignment="Tabular" Margin="0,2,0,0"/><ProgressBar x:Name="StorageProgressBar" Style="{StaticResource MediaProgressStyle}" Minimum="0" Maximum="1" Value="0" Height="4" Margin="0,5,0,0" IsHitTestVisible="False"/></StackPanel>
+                    <StackPanel x:Name="NotificationStripGroup" Grid.Column="4" VerticalAlignment="Center" Margin="16,0"><TextBlock Text="NOTIFICATIONS" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}"/><TextBlock x:Name="NotificationPrimaryText" Text="No notifications" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/><TextBlock x:Name="NotificationDetailText" FontSize="9.5" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/></StackPanel>
+                    <Border x:Name="NotificationSeparator" Grid.Column="3" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,4" Visibility="Visible"/>
+                    <Border x:Name="BatterySeparator" Grid.Column="5" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,4" Visibility="Collapsed"/>
+                    <StackPanel x:Name="BatteryStripGroup" Grid.Column="6" VerticalAlignment="Center" Margin="16,0,0,0" Visibility="Collapsed"><TextBlock Text="BATTERY" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}"/><TextBlock x:Name="BatteryText" Text="--" FontSize="11" Typography.NumeralAlignment="Tabular" Margin="0,2,0,0"/><TextBlock x:Name="BatteryStateText" FontSize="9.5" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,1,0,0"/></StackPanel>
                 </Grid>
             </Grid>
         </Grid>

@@ -35,11 +35,14 @@ public partial class MainWindow : Window
     private readonly DownloadMonitorService _downloadMonitorService = new();
     private readonly FocusTimerService _focusTimerService = new();
     private readonly NotificationService _notificationService = new();
+    private readonly DiscordVoiceService _discordVoiceService = new();
+    private readonly BlurHostService _blurHostService = new();
     private readonly MonitorService _monitorService;
     private readonly DispatcherTimer _statsTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _mediaTimer = new() { Interval = TimeSpan.FromMilliseconds(850) };
     private readonly DispatcherTimer _themeTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _notificationTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+    private readonly DispatcherTimer _discordTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _peekTimer = new();
     private readonly DispatcherTimer _collapseTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
 
@@ -54,6 +57,7 @@ public partial class MainWindow : Window
     private double _targetTopDip;
     private int _notificationCount;
     private bool _monitorTransitioning;
+    private bool _externalBlurAvailable;
 
     public event EventHandler? SettingsChanged;
 
@@ -72,6 +76,7 @@ public partial class MainWindow : Window
         _mediaTimer.Tick += MediaTimer_Tick;
         _themeTimer.Tick += ThemeTimer_Tick;
         _notificationTimer.Tick += NotificationTimer_Tick;
+        _discordTimer.Tick += DiscordTimer_Tick;
         SizeChanged += (_, _) =>
         {
             UpdateGeometry();
@@ -90,6 +95,7 @@ public partial class MainWindow : Window
         _overlayBehavior.Attach();
 
         _currentMonitor = _monitorService.Resolve(_settings);
+        _externalBlurAvailable = RequiresLiveBlur(_settings.Material) && _blurHostService.Start(_hwnd);
         ApplyBackdropMaterial();
         PositionOnCurrentMonitor();
     }
@@ -102,12 +108,13 @@ public partial class MainWindow : Window
             _overlayBehavior.Detach();
         }
         _notificationTimer.Stop();
+        _blurHostService.Dispose();
         _statsService.Dispose();
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        _themeService.Apply(_settings.Theme, _settings.Material);
+        _themeService.Apply(_settings.Theme, _settings.Material, _externalBlurAvailable);
         _lastSystemLight = _themeService.IsSystemLightTheme();
         if (_settings.StartWithWindows)
         {
@@ -126,8 +133,10 @@ public partial class MainWindow : Window
         await _mediaService.InitializeAsync();
         await RefreshMediaAsync();
         await RefreshNotificationsAsync();
+        await RefreshDiscordVoiceAsync();
         _mediaTimer.Start();
         _notificationTimer.Start();
+        _discordTimer.Start();
     }
 
     private void OverlayBehavior_DisplayEnvironmentChanged(object? sender, EventArgs e)
@@ -286,8 +295,8 @@ public partial class MainWindow : Window
             case SurfaceState.Expanded:
                 surfaceWidth = _settings.WidthPreset == WidthPreset.FullWidth
                     ? maxWidth
-                    : Math.Min(Math.Max(baseWidth, 960), maxWidth);
-                windowHeight = _settings.Style == IslandStyle.Notch ? 216 : 264;
+                    : Math.Min(Math.Max(baseWidth, 1180), maxWidth);
+                windowHeight = _settings.Style == IslandStyle.Notch ? 312 : 328;
                 break;
             default:
                 surfaceWidth = baseWidth;
@@ -484,12 +493,14 @@ public partial class MainWindow : Window
 
     private async void NotificationTimer_Tick(object? sender, EventArgs e) => await RefreshNotificationsAsync();
 
+    private async void DiscordTimer_Tick(object? sender, EventArgs e) => await RefreshDiscordVoiceAsync();
+
     private async Task RefreshNotificationsAsync()
     {
         var snapshot = await _notificationService.SampleAsync();
         var show = snapshot.AccessAllowed;
         _notificationCount = show ? snapshot.Count : 0;
-        NotificationColumn.Width = show ? new GridLength(190) : new GridLength(0);
+        NotificationColumn.Width = show ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
         NotificationStripGroup.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         NotificationSeparator.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
 
@@ -502,7 +513,7 @@ public partial class MainWindow : Window
 
         if (snapshot.HasNotifications)
         {
-            NotificationPrimaryText.Text = $"{snapshot.AppName}  ·  {snapshot.Count}";
+            NotificationPrimaryText.Text = $"{snapshot.AppName} \u00B7 {snapshot.Count}";
             NotificationDetailText.Text = snapshot.Text;
         }
         else
@@ -512,12 +523,47 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task RefreshDiscordVoiceAsync()
+    {
+        await _discordVoiceService.RefreshAsync();
+        var voice = _discordVoiceService.Current;
+
+        if (!voice.IsRunning)
+        {
+            DiscordVoiceStateText.Text = "Discord";
+            DiscordVoiceChannelText.Text = "Not running";
+            DiscordVoiceDetailText.Text = "Discord is not open";
+            DiscordVoiceStatusStrip.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (!voice.IsConnected)
+        {
+            DiscordVoiceStateText.Text = "Discord";
+            DiscordVoiceChannelText.Text = "Not in voice";
+            DiscordVoiceDetailText.Text = string.IsNullOrWhiteSpace(voice.ServerName) ? "No active voice connection" : voice.ServerName;
+            DiscordVoiceStatusStrip.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        DiscordVoiceStateText.Text = "Discord";
+        var channel = string.IsNullOrWhiteSpace(voice.ChannelName) ? "Voice channel" : voice.ChannelName;
+        DiscordVoiceChannelText.Text = voice.IsMuted ? $"{channel} · muted" : $"{channel} · voice connected";
+        DiscordVoiceChannelText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "AccentBrush");
+        var participantText = voice.ParticipantCount > 0 ? $"{voice.ParticipantCount} in call" : "In call";
+        var serverText = string.IsNullOrWhiteSpace(voice.ServerName) ? participantText : $"{voice.ServerName} · {participantText}";
+        DiscordVoiceDetailText.Text = string.IsNullOrWhiteSpace(voice.ParticipantSummary) ? serverText : $"{serverText} · {voice.ParticipantSummary}";
+        DiscordVoiceStatusText.Text = voice.IsDeafened ? "Mic muted \u00B7 Audio muted" : voice.IsMuted ? "Mic muted \u00B7 Audio on" : "Mic live \u00B7 Audio on";
+        DiscordVoiceStatusStrip.Visibility = Visibility.Visible;
+    }
+
     public bool NotificationsAllowed => _notificationService.IsAccessAllowed();
 
     public async Task EnableNotificationsAsync()
     {
         _ = await _notificationService.RequestAccessAsync();
         await RefreshNotificationsAsync();
+        await RefreshDiscordVoiceAsync();
         SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -656,6 +702,12 @@ public partial class MainWindow : Window
         var stats = _statsService.Sample();
         CompactStatsText.Text = $"CPU {stats.CpuPercent:0}%   GPU {stats.GpuPercent:0}%   RAM {stats.RamPercent:0}%";
         ExpandedSystemText.Text = $"CPU {stats.CpuPercent:0}%   GPU {stats.GpuPercent:0}%   RAM {stats.RamPercent:0}%";
+        CpuValueText.Text = $"{stats.CpuPercent:0}%";
+        GpuValueText.Text = $"{stats.GpuPercent:0}%";
+        RamValueText.Text = $"{stats.RamPercent:0}%";
+        CpuProgressBar.Value = stats.CpuPercent;
+        GpuProgressBar.Value = stats.GpuPercent;
+        RamProgressBar.Value = stats.RamPercent;
         ExpandedNetworkText.Text = $"\u2193 {stats.DownloadMbps:0.0}   \u2191 {stats.UploadMbps:0.0} Mbps";
 
         if (stats.StorageTotalBytes > 0)
@@ -680,12 +732,14 @@ public partial class MainWindow : Window
         }
 
         var downloads = _downloadMonitorService.Sample();
+        DownloadActivityProgressBar.Visibility = downloads.HasActive ? Visibility.Visible : Visibility.Collapsed;
+
         if (downloads.HasActive)
         {
             DownloadPrimaryText.Text = downloads.PrimaryName;
             DownloadDetailText.Text = downloads.PrimaryMegabytesPerSecond > 0.05
-                ? $"{FormatBytes(downloads.PrimaryBytes)}  ·  {downloads.PrimaryMegabytesPerSecond:0.0} MB/s  ·  {downloads.ActiveCount} active"
-                : $"{FormatBytes(downloads.PrimaryBytes)}  ·  {downloads.ActiveCount} active";
+                ? $"{FormatBytes(downloads.PrimaryBytes)} \u00B7 {downloads.PrimaryMegabytesPerSecond:0.0} MB/s \u00B7 {downloads.ActiveCount} active"
+                : $"{FormatBytes(downloads.PrimaryBytes)} \u00B7 {downloads.ActiveCount} active";
         }
         else
         {
@@ -703,9 +757,16 @@ public partial class MainWindow : Window
         {
             activity.Add($"Focus {focus.Display}");
         }
+        DownloadActivityProgressBar.Visibility = downloads.HasActive ? Visibility.Visible : Visibility.Collapsed;
+
         if (downloads.HasActive)
         {
             activity.Add($"DL {downloads.ActiveCount}");
+        }
+        var discordVoice = _discordVoiceService.Current;
+        if (discordVoice.IsConnected)
+        {
+            activity.Add(string.IsNullOrWhiteSpace(discordVoice.ChannelName) ? "Discord VC" : $"VC {discordVoice.ChannelName}");
         }
         if (_notificationCount > 0)
         {
@@ -714,7 +775,7 @@ public partial class MainWindow : Window
         var compactBaseWidth = ResolveBaseSurfaceWidth(GetTargetScreenWidthDip());
         if (compactBaseWidth >= 1400)
         {
-            activity.Add($"NET ↓{stats.DownloadMbps:0.0} ↑{stats.UploadMbps:0.0}");
+            activity.Add($"NET \u2193{stats.DownloadMbps:0.0} \u2191{stats.UploadMbps:0.0}");
             if (stats.StorageFreeBytes > 0)
             {
                 activity.Add($"SSD {FormatBytes(stats.StorageFreeBytes)}");
@@ -724,7 +785,7 @@ public partial class MainWindow : Window
                 activity.Add($"BAT {stats.BatteryPercent:0}%");
             }
         }
-        CompactActivityText.Text = string.Join("  ·  ", activity);
+        CompactActivityText.Text = string.Join("  繝ｻ繧托ｽｽ・ｷ  ", activity);
         UpdateCompactDensity();
     }
 
@@ -748,6 +809,18 @@ public partial class MainWindow : Window
 
     private void ThemeTimer_Tick(object? sender, EventArgs e)
     {
+        var wantsBlur = RequiresLiveBlur(_settings.Material);
+        if (!wantsBlur && _blurHostService.IsRunning)
+        {
+            _blurHostService.Stop();
+        }
+        var blurAvailable = wantsBlur && _blurHostService.Start(_hwnd);
+        if (blurAvailable != _externalBlurAvailable)
+        {
+            _externalBlurAvailable = blurAvailable;
+            _themeService.Apply(_settings.Theme, _settings.Material, _externalBlurAvailable);
+        }
+
         if (_settings.Theme != AppThemeMode.System)
         {
             return;
@@ -760,7 +833,7 @@ public partial class MainWindow : Window
         }
 
         _lastSystemLight = current;
-        _themeService.Apply(AppThemeMode.System, _settings.Material);
+        _themeService.Apply(AppThemeMode.System, _settings.Material, _externalBlurAvailable);
         ApplyBackdropMaterial();
     }
 
@@ -868,7 +941,7 @@ public partial class MainWindow : Window
         if (style == IslandStyle.Notch)
         {
             _settings.Material = SurfaceMaterial.Solid;
-            _themeService.Apply(_settings.Theme, _settings.Material);
+            _themeService.Apply(_settings.Theme, _settings.Material, _externalBlurAvailable);
             ApplyBackdropMaterial();
         }
         SaveAndRefresh();
@@ -883,15 +956,27 @@ public partial class MainWindow : Window
     public void SetMaterial(SurfaceMaterial material)
     {
         _settings.Material = material;
-        _themeService.Apply(_settings.Theme, _settings.Material);
+        if (RequiresLiveBlur(material))
+        {
+            _externalBlurAvailable = _blurHostService.Start(_hwnd);
+        }
+        else
+        {
+            _blurHostService.Stop();
+            _externalBlurAvailable = false;
+        }
+        _themeService.Apply(_settings.Theme, _settings.Material, _externalBlurAvailable);
         ApplyBackdropMaterial();
         SaveAndRefresh();
     }
 
+    private static bool RequiresLiveBlur(SurfaceMaterial material) =>
+        material is SurfaceMaterial.Acrylic or SurfaceMaterial.Glass;
+
     public void SetTheme(AppThemeMode theme)
     {
         _settings.Theme = theme;
-        _themeService.Apply(_settings.Theme, _settings.Material);
+        _themeService.Apply(_settings.Theme, _settings.Material, _externalBlurAvailable);
         ApplyBackdropMaterial();
         SaveAndRefresh();
     }
@@ -965,9 +1050,9 @@ public partial class MainWindow : Window
         AcrylicMaterialMenuItem.IsChecked = _settings.Material == SurfaceMaterial.Acrylic;
         GlassMaterialMenuItem.IsChecked = _settings.Material == SurfaceMaterial.Glass;
         MaterialCopyMenuItem.IsChecked = _settings.Material == SurfaceMaterial.MaterialCopy;
-
-        SystemThemeMenuItem.IsChecked = _settings.Theme == AppThemeMode.System;
-        DarkThemeMenuItem.IsChecked = _settings.Theme == AppThemeMode.Dark;
+        var materialYou = _settings.Material == SurfaceMaterial.MaterialCopy;
+        MaterialYouTopContainer.Visibility = materialYou ? Visibility.Visible : Visibility.Collapsed;
+        MaterialYouBottomContainer.Visibility = materialYou ? Visibility.Visible : Visibility.Collapsed;
         LightThemeMenuItem.IsChecked = _settings.Theme == AppThemeMode.Light;
 
         UpdateCompactDensity();
