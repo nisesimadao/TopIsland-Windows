@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 
 Get-Process TopIsland,TopIsland.BlurHost -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 200
@@ -18,4 +18,3 @@ if (Test-Path $installRoot) {
 }
 
 Write-Output 'TopIsland was removed. User settings in %APPDATA%\TopIsland were left intact.'
-

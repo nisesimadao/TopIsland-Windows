@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$SourceDirectory = (Join-Path $PSScriptRoot '..\artifacts\publish'),
     [switch]$NoLaunch
 )
@@ -50,4 +50,3 @@ if (-not $NoLaunch) {
 
 Write-Output "Installed TopIsland to $installRoot"
 Write-Output "Start Menu shortcut: $shortcutPath"
-
