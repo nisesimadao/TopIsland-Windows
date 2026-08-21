@@ -1,6 +1,6 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
-Get-Process TopIsland -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process TopIsland,TopIsland.BlurHost -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 200
 
 $installRoot = Join-Path $env:LOCALAPPDATA 'Programs\TopIsland'
@@ -18,3 +18,4 @@ if (Test-Path $installRoot) {
 }
 
 Write-Output 'TopIsland was removed. User settings in %APPDATA%\TopIsland were left intact.'
+

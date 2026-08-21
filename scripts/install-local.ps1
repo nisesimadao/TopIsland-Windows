@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$SourceDirectory = (Join-Path $PSScriptRoot '..\artifacts\publish'),
     [switch]$NoLaunch
 )
@@ -9,7 +9,7 @@ $source = (Resolve-Path $SourceDirectory).Path
 $installRoot = Join-Path $env:LOCALAPPDATA 'Programs\TopIsland'
 $exe = Join-Path $installRoot 'TopIsland.exe'
 
-Get-Process TopIsland -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process TopIsland,TopIsland.BlurHost -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 250
 
 if (Test-Path $installRoot) {
@@ -50,3 +50,4 @@ if (-not $NoLaunch) {
 
 Write-Output "Installed TopIsland to $installRoot"
 Write-Output "Start Menu shortcut: $shortcutPath"
+
