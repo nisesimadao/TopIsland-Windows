@@ -205,3 +205,13 @@ Local installation uses `%LOCALAPPDATA%\Programs\TopIsland` and creates a Start 
 ## Status
 
 TopIsland is still an interactive prototype, but its core overlay is functional: media/foreground context, the contextual Expanded layout, hidden-window Discord voice-state/control integration, focus/download monitoring, Windows notification reading when permitted, geometry/motion, click-through and no-activate behavior, system-tray configuration, persistence, multi-display placement, PerMonitorV2 scaling, Material You dynamic color, and shape-clipped live blur materials are working.
+
+### Product video renderer
+
+The repository includes `TopIsland.PvRenderer`, a deterministic WPF renderer for the product video. It reuses TopIsland's real notch geometry (`IslandGeometryFactory`) and renders every frame directly at 1920x1080/60 fps instead of screen-recording and interpolating a low-frame-rate capture. The renderer owns its own camera timeline, so product shots stay centered while selected sections can be zoomed, panned, and highlighted intentionally.
+
+```powershell
+dotnet run --project .\TopIsland.PvRenderer\TopIsland.PvRenderer.csproj -c Release -- .\docs\TopIsland-PV.mp4
+```
+
+The current timeline is notch-only and demonstrates top-edge reveal, compact status, expansion, focused metric/system highlights, collapse, and the final hidden state.
