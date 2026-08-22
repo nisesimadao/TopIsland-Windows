@@ -12,6 +12,7 @@ public sealed record ForegroundAppSnapshot(
     string ProcessName,
     int ProcessId,
     long WorkingSetBytes,
+    double CpuPercent,
     int ThreadCount,
     DateTimeOffset? StartedAt,
     byte[]? IconPng);
@@ -20,6 +21,9 @@ public sealed class ForegroundAppService
 {
     private string? _lastIconPath;
     private byte[]? _lastIconPng;
+    private int _lastCpuProcessId;
+    private TimeSpan _lastCpuTime;
+    private DateTimeOffset _lastCpuSampleAt;
 
     public ForegroundAppSnapshot Sample()
     {
@@ -38,6 +42,7 @@ public sealed class ForegroundAppService
 
             var processName = "Windows";
             var workingSetBytes = 0L;
+            var cpuPercent = 0d;
             var threadCount = 0;
             DateTimeOffset? startedAt = null;
             byte[]? icon = null;
@@ -46,6 +51,7 @@ public sealed class ForegroundAppService
                 using var process = Process.GetProcessById((int)processId);
                 processName = process.ProcessName;
                 workingSetBytes = Math.Max(0, process.WorkingSet64);
+                cpuPercent = SampleCpuPercent(process);
                 try { threadCount = process.Threads.Count; } catch { threadCount = 0; }
                 try { startedAt = process.StartTime; } catch { startedAt = null; }
                 icon = TryGetIcon(process);
@@ -67,6 +73,7 @@ public sealed class ForegroundAppService
                 processName,
                 (int)processId,
                 workingSetBytes,
+                cpuPercent,
                 threadCount,
                 startedAt,
                 icon);
@@ -74,6 +81,35 @@ public sealed class ForegroundAppService
         catch
         {
             return Empty();
+        }
+    }
+
+    private double SampleCpuPercent(Process process)
+    {
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var cpu = process.TotalProcessorTime;
+            var pid = process.Id;
+            var percent = 0d;
+            if (_lastCpuProcessId == pid && _lastCpuSampleAt != default)
+            {
+                var elapsedMs = (now - _lastCpuSampleAt).TotalMilliseconds;
+                var cpuMs = (cpu - _lastCpuTime).TotalMilliseconds;
+                if (elapsedMs > 20 && cpuMs >= 0)
+                {
+                    percent = Math.Clamp(cpuMs / elapsedMs / Math.Max(1, Environment.ProcessorCount) * 100d, 0, 100);
+                }
+            }
+
+            _lastCpuProcessId = pid;
+            _lastCpuTime = cpu;
+            _lastCpuSampleAt = now;
+            return percent;
+        }
+        catch
+        {
+            return 0;
         }
     }
 
@@ -116,6 +152,7 @@ public sealed class ForegroundAppService
     private static ForegroundAppSnapshot Empty() => new(
         "Desktop",
         "Windows",
+        0,
         0,
         0,
         0,

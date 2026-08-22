@@ -29,7 +29,7 @@ The reference appearance is intentionally restrained: **one surface, real data, 
 TopIsland currently uses real Windows/application data for:
 
 - Windows GMTC media title, source, artwork, playback position, interactive seek and Previous / Play-Pause / Next
-- Foreground application title, process and executable icon; Expanded also shows live foreground-process memory, thread count and process uptime in the SESSION lane when no download is active
+- Foreground application title, process and executable icon; Expanded also shows live foreground-process CPU, memory and process uptime in the SESSION lane when no download is active
 - **CPU / GPU / RAM** usage
 - **Discord VC** from the live Discord Desktop accessibility tree, including hidden/tray-minimized Electron windows, channel/server, participant count, Mute/Deafen state and real Mute / Deafen / Leave controls when Discord exposes those UIA patterns
 - Network download/upload throughput
@@ -49,7 +49,7 @@ Notification permission is never requested automatically. If access is not alrea
 - **Peek** — reveals selected lower-priority information without opening the full surface
 - **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM and Discord voice controls, and Notifications when present. The lower row is Timers, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware
 
-Smaller widths remove information instead of shrinking every label. Downloads still exists only while a partial download is actively changing: otherwise the same middle lane becomes SESSION with foreground-process memory, thread count and uptime. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. The Expanded clock remains the visual anchor above the two-row information layout.
+Smaller widths remove information instead of shrinking every label. Downloads still exists only while a partial download is actively changing: otherwise the same middle lane becomes SESSION with foreground-process CPU, memory and uptime. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. The Expanded clock remains the visual anchor above the two-row information layout.
 
 ## Screenshots
 

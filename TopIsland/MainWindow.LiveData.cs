@@ -530,8 +530,8 @@ public partial class MainWindow
         var session = _foregroundAppService.Sample();
         SessionProcessText.Text = session.ProcessName;
         var sessionDetails = new List<string>();
-        if (session.WorkingSetBytes > 0) sessionDetails.Add($"Memory {FormatBytes(session.WorkingSetBytes)}");
-        if (session.ThreadCount > 0) sessionDetails.Add($"{session.ThreadCount} threads");
+        sessionDetails.Add($"CPU {session.CpuPercent:0.0}%");
+        if (session.WorkingSetBytes > 0) sessionDetails.Add(FormatBytes(session.WorkingSetBytes));
         if (session.StartedAt is DateTimeOffset startedAt) sessionDetails.Add($"Up {FormatSessionAge(DateTimeOffset.Now - startedAt)}");
         SessionDetailText.Text = sessionDetails.Count > 0
             ? string.Join(" \u00B7 ", sessionDetails)
