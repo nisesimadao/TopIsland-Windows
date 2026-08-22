@@ -63,6 +63,7 @@ public partial class MainWindow : Window
     private long _monitorTransitionSerial;
     private bool _externalBlurAvailable;
     private bool _windowTransitionActive;
+    private bool _surfaceMotionFrameInProgress;
     private long _windowTransitionStartedTimestamp;
     private int _windowTransitionDurationMs;
     private double _windowFromWidth;
@@ -161,6 +162,7 @@ public partial class MainWindow : Window
         _collapseTimer.Stop();
         _pointerTimer.Stop();
         _transitionGuardTimer.Stop();
+        StopWindowTransition();
         _blurHostService.Dispose();
         _statsService.Dispose();
         _hardwareTelemetryService?.Dispose();

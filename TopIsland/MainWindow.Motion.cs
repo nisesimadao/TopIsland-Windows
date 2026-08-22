@@ -407,6 +407,9 @@ public partial class MainWindow
 
         _windowTransitionStartedTimestamp = Stopwatch.GetTimestamp();
         _windowTransitionActive = true;
+        // Rendering is a static event. Defensively remove first so interrupted
+        // transitions can never accumulate duplicate callbacks.
+        CompositionTarget.Rendering -= WindowTransition_Rendering;
         CompositionTarget.Rendering += WindowTransition_Rendering;
     }
 
@@ -418,13 +421,29 @@ public partial class MainWindow
             return;
         }
 
-        var elapsedMs = Stopwatch.GetElapsedTime(_windowTransitionStartedTimestamp).TotalMilliseconds;
-        var t = Math.Clamp(elapsedMs / Math.Max(1, _windowTransitionDurationMs), 0, 1);
-        ApplySurfaceMotionFrame(MotionProfile.Ease(t));
-
-        if (t >= 1)
+        // Layout/size changes can pump WPF messages. Never allow a rendering
+        // callback to enter itself; one physical display frame gets one motion
+        // update, full stop.
+        if (_surfaceMotionFrameInProgress)
         {
-            CompleteWindowTransition();
+            return;
+        }
+
+        _surfaceMotionFrameInProgress = true;
+        try
+        {
+            var elapsedMs = Stopwatch.GetElapsedTime(_windowTransitionStartedTimestamp).TotalMilliseconds;
+            var t = Math.Clamp(elapsedMs / Math.Max(1, _windowTransitionDurationMs), 0, 1);
+            ApplySurfaceMotionFrame(MotionProfile.Ease(t));
+
+            if (t >= 1)
+            {
+                CompleteWindowTransition();
+            }
+        }
+        finally
+        {
+            _surfaceMotionFrameInProgress = false;
         }
     }
 
@@ -481,10 +500,10 @@ public partial class MainWindow
         // layout for one frame, producing the visible "blank enlarged shell".
         SetCurrentValue(WidthProperty, width);
         SetCurrentValue(HeightProperty, height);
-        // CompositionTarget.Rendering runs after the normal layout pass. Force
-        // the invalidated layout now so the shell and its arranged content are
-        // committed to the same rendered frame instead of trailing by one frame.
-        UpdateLayout();
+        // Do not call UpdateLayout() here. Rendering can be re-entered by a
+        // forced layout pass, which previously created nested motion frames,
+        // tanked FPS, and let stale heights overwrite the expanded surface. WPF
+        // will coalesce this invalidation into its normal layout/render pipeline.
         if (_hwnd != IntPtr.Zero && _currentMonitor is not null)
         {
             _monitorService.PositionWindow(_hwnd, _currentMonitor, _currentTopDip);
@@ -522,11 +541,8 @@ public partial class MainWindow
 
     private void StopWindowTransition()
     {
-        if (!_windowTransitionActive)
-        {
-            return;
-        }
-
+        // Always detach. A stale/duplicate subscription must not survive merely
+        // because the active flag was already cleared by an interrupted frame.
         CompositionTarget.Rendering -= WindowTransition_Rendering;
         _windowTransitionActive = false;
     }
