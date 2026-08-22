@@ -73,6 +73,7 @@ Expanded Notch follows the BoringNotch relationship:
 - Standard: add subtitle/source when space allows
 - Idle >= 520 dip: allow compact CPU/RAM as clipped 270-degree tachometer arcs; do not use full 360-degree rings in the compact shell
 - Peek >= 430 dip: allow compact CPU/RAM
+- Hover/Peek: a running Focus timer gets the dedicated remaining-time + Pause/Resume control; otherwise show at most one lower-priority activity summary at Standard width
 - Expanded: the top row is Context/Now Playing, a large clock-centered Overview (CPU/GPU/RAM, power/thermal summary, live Discord voice controls), and Notifications when real notifications exist. The lower row is Timers, a SESSION lane using live foreground-process telemetry that is replaced by Downloads only while bytes are actively changing, and compact Storage/Network/Hardware metrics.
 
 Do not scale typography down to preserve content. Remove lower-priority content instead.
@@ -151,6 +152,7 @@ Verified development setup:
 A wider shell does not justify stretching its content.
 
 - Full Width extends the outer surface while preserving safe margins.
+- The Full Width settings gear opens the existing context menu; it is a real configuration entry point, not a decorative icon
 - The media information/progress/control column has a readable maximum width (`520 dip` in the current layout).
 - Status information may remain anchored to the right edge.
 - Empty space between content groups is preferable to stretching progress bars, text blocks, or artwork to fill the shell.

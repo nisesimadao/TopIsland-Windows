@@ -53,10 +53,16 @@ Windows通知の権限は起動時に勝手に要求しません。許可がな�
 
 ## Screenshots
 
-<p align="center">
-  <b>Standard Idle · tachometer CPU/RAM</b><br>
-  <img src="docs/screenshots/compact-idle.png" alt="TopIsland Standard idle with tachometer CPU and RAM meters" width="72%">
-</p>
+<table>
+  <tr>
+    <td align="center"><b>Standard Idle · tachometer CPU/RAM</b></td>
+    <td align="center"><b>Hover · active Focus control</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/compact-idle.png" alt="TopIsland Standard idle with tachometer CPU and RAM meters"></td>
+    <td><img src="docs/screenshots/compact-hover-focus.png" alt="TopIsland hover with running Focus timer and pause control"></td>
+  </tr>
+</table>
 <table>
   <tr>
     <td align="center"><b>Dynamic Island · Material You</b></td>

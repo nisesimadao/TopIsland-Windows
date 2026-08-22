@@ -47,17 +47,24 @@ Notification permission is never requested automatically. If access is not alrea
 
 - **Idle** — media/app context, clock, clipped tachometer-style CPU/RAM arcs and compact activity indicators when the selected width allows them
 - **Hover** — subtly wider/deeper
+- Hover gives a running Focus timer its own remaining-time + real Pause/Resume control before lower-priority activity text
 - **Peek** — reveals selected lower-priority information without opening the full surface
 - **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM and Discord voice controls, and Notifications when present. The lower row is Timers, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware
 
-Smaller widths remove information instead of shrinking every label. When no download is moving, the lower middle lane shows the foreground **SESSION** (process, memory, CPU, threads and uptime); an active download replaces that lane instead of creating another permanent card. Downloads still exists only while a partial download is actively changing: otherwise the same middle lane becomes SESSION with foreground-process CPU, memory and uptime. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. The Expanded clock remains the visual anchor above the two-row information layout.
+Smaller widths remove information instead of shrinking every label. When no download is moving, the lower middle lane shows the foreground **SESSION** (process, memory, CPU, threads and uptime); an active download replaces that lane instead of creating another permanent card. Downloads still exists only while a partial download is actively changing: otherwise the same middle lane becomes SESSION with foreground-process CPU, memory and uptime. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. Its right-edge settings gear opens the same real TopIsland context menu used by the tray/overlay. The Expanded clock remains the visual anchor above the two-row information layout.
 
 ## Screenshots
 
-<p align="center">
-  <b>Standard Idle · tachometer CPU/RAM</b><br>
-  <img src="docs/screenshots/compact-idle.png" alt="TopIsland Standard idle with tachometer CPU and RAM meters" width="72%">
-</p>
+<table>
+  <tr>
+    <td align="center"><b>Standard Idle · tachometer CPU/RAM</b></td>
+    <td align="center"><b>Hover · active Focus control</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/compact-idle.png" alt="TopIsland Standard idle with tachometer CPU and RAM meters"></td>
+    <td><img src="docs/screenshots/compact-hover-focus.png" alt="TopIsland hover with running Focus timer and pause control"></td>
+  </tr>
+</table>
 <table>
   <tr>
     <td align="center"><b>Dynamic Island · Material You</b></td>
