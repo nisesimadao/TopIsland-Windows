@@ -113,22 +113,20 @@ public sealed class LayoutAndGeometryTests
     }
 
     [Fact]
-    public void EdgeRevealProfileIsMonotonicAndShouldersLagBody()
+    public void EdgeRevealShouldersGrowMonotonicallyAndLagBody()
     {
         var previous = 0.0;
         for (var i = 1; i <= 20; i++)
         {
-            var t = i / 20.0;
-            var current = EdgeRevealProfile.EaseReveal(t);
-            Assert.True(current >= previous);
-            Assert.InRange(EdgeRevealProfile.ShoulderScale(current), 0, current + 0.000001);
-            previous = current;
+            var body = i / 20.0;
+            var shoulder = EdgeRevealProfile.ShoulderScale(body);
+            Assert.True(shoulder >= previous);
+            Assert.InRange(shoulder, 0, body + 0.000001);
+            previous = shoulder;
         }
 
-        Assert.Equal(0, EdgeRevealProfile.EaseReveal(0), 8);
-        Assert.Equal(1, EdgeRevealProfile.EaseReveal(1), 8);
-        Assert.Equal(1, EdgeRevealProfile.EaseHide(0), 8);
-        Assert.Equal(0, EdgeRevealProfile.EaseHide(1), 8);
+        Assert.Equal(0, EdgeRevealProfile.ShoulderScale(0), 8);
+        Assert.Equal(1, EdgeRevealProfile.ShoulderScale(1), 8);
     }
 
     [Theory]
@@ -140,7 +138,7 @@ public sealed class LayoutAndGeometryTests
     }
 
     [Fact]
-    public void MotionEaseIsResponsiveAndMonotonic()
+    public void MotionEaseHasSoftEndpointsAndIsMonotonic()
     {
         var previous = MotionProfile.Ease(0);
         for (var i = 1; i <= 20; i++)
@@ -150,8 +148,9 @@ public sealed class LayoutAndGeometryTests
             previous = current;
         }
 
-        Assert.True(MotionProfile.Ease(0.25) > 0.4);
-        Assert.True(MotionProfile.Ease(0.5) > 0.75);
+        Assert.InRange(MotionProfile.Ease(0.05), 0.0, 0.02);
+        Assert.Equal(0.5, MotionProfile.Ease(0.5), 8);
+        Assert.InRange(MotionProfile.Ease(0.95), 0.98, 1.0);
     }
 
     [Fact]
@@ -161,7 +160,7 @@ public sealed class LayoutAndGeometryTests
         var shortMove = MotionProfile.ScaleDuration(200, 20, 8);
 
         Assert.Equal(200, full);
-        Assert.InRange(shortMove, 65, 150);
+        Assert.InRange(shortMove, 130, 175);
         Assert.True(shortMove < full);
     }
 

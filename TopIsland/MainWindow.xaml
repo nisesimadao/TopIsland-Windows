@@ -116,15 +116,18 @@
             <Grid x:Name="CompactBar"
                   Height="34"
                   VerticalAlignment="Top"
-                  Margin="28,15,28,0"
+                  Margin="30,18,30,0"
                   Background="Transparent"
                   MouseLeftButtonUp="CompactBar_MouseLeftButtonUp">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="1"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="1"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="1"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
@@ -180,22 +183,22 @@
                     </StackPanel>
                 </Grid>
 
-                <Border Grid.Column="3" Width="1" HorizontalAlignment="Left" Background="{DynamicResource DividerBrush}" Margin="0,5,0,5"/>
-                <StackPanel x:Name="CompactClockPanel" Grid.Column="3" VerticalAlignment="Center" Margin="10,0,10,0">
+                <Border Grid.Column="3" Background="{DynamicResource DividerBrush}" Margin="0,5"/>
+                <StackPanel x:Name="CompactClockPanel" Grid.Column="4" VerticalAlignment="Center" Margin="10,0,10,0">
                     <TextBlock x:Name="ClockText" Text="21:00" FontSize="13" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" HorizontalAlignment="Center"/>
                     <TextBlock x:Name="CompactDateText" Text="8/22" FontSize="8" Foreground="{DynamicResource TertiaryTextBrush}" HorizontalAlignment="Center" Visibility="Collapsed"/>
                 </StackPanel>
 
-                <Border Grid.Column="4" Width="1" HorizontalAlignment="Left" Background="{DynamicResource DividerBrush}" Margin="0,5,0,5"/>
-                <Grid x:Name="CompactMetersHost" Grid.Column="4" Height="34" Width="88" ClipToBounds="False" VerticalAlignment="Center" Margin="6,0,0,0">
+                <Border Grid.Column="5" Background="{DynamicResource DividerBrush}" Margin="0,5"/>
+                <Grid x:Name="CompactMetersHost" Grid.Column="6" Height="34" Width="88" ClipToBounds="False" VerticalAlignment="Center" Margin="6,0,0,0">
                     <StackPanel x:Name="CompactMetersPanel" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                         <controls:RadialMeter x:Name="CompactCpuMeter" Width="43" Height="34" Label="CPU" ShowLabel="False" IsTachometer="True" Value="0" ProgressBrush="{DynamicResource AccentBrush}" TrackBrush="{DynamicResource DividerBrush}" TextBrush="{DynamicResource PrimaryTextBrush}" SecondaryTextBrush="{DynamicResource TertiaryTextBrush}" Margin="0,0,2,0"/>
                         <controls:RadialMeter x:Name="CompactRamMeter" Width="43" Height="34" Label="RAM" ShowLabel="False" IsTachometer="True" Value="0" ProgressBrush="{DynamicResource AccentBrush}" TrackBrush="{DynamicResource DividerBrush}" TextBrush="{DynamicResource PrimaryTextBrush}" SecondaryTextBrush="{DynamicResource TertiaryTextBrush}"/>
                     </StackPanel>
                 </Grid>
 
-                <Border Grid.Column="5" Width="1" HorizontalAlignment="Left" Background="{DynamicResource DividerBrush}" Margin="0,5,0,5"/>
-                <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center" Margin="9,0,0,0">
+                <Border Grid.Column="7" Background="{DynamicResource DividerBrush}" Margin="0,5"/>
+                <StackPanel Grid.Column="8" Orientation="Horizontal" VerticalAlignment="Center" Margin="9,0,0,0">
                     <StackPanel x:Name="CompactIndicatorsPanel" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
                         <StackPanel x:Name="CompactNotificationIndicator" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed" Margin="0,0,8,0">
                             <Viewbox Width="12" Height="12"><Path Data="{StaticResource BellGeometry}" Fill="{DynamicResource SecondaryTextBrush}"/></Viewbox>
@@ -206,7 +209,7 @@
                             <TextBlock x:Name="CompactDownloadText" Text="0" FontSize="8.5" Foreground="{DynamicResource SecondaryTextBrush}" Margin="3,0,0,0"/>
                         </StackPanel>
                     </StackPanel>
-                                        <StackPanel x:Name="CompactFocusGroup" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed" Margin="10,0,0,0">
+                    <StackPanel x:Name="CompactFocusGroup" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed" Margin="10,0,0,0">
                         <TextBlock x:Name="CompactFocusText" Text="Focus 25:00" FontSize="9" Foreground="{DynamicResource SecondaryTextBrush}" Typography.NumeralAlignment="Tabular" VerticalAlignment="Center"/>
                         <Button Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Margin="4,0,0,0" Click="FocusToggleButton_Click" ToolTip="Pause / resume focus timer" AutomationProperties.Name="Toggle focus timer">
                             <Grid Width="10" Height="10"><Viewbox x:Name="CompactFocusPlayIconViewbox" Width="10" Height="10" Visibility="Collapsed"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox><Viewbox x:Name="CompactFocusPauseIconViewbox" Width="10" Height="10"><Path Data="{StaticResource PauseGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Grid>
@@ -220,7 +223,7 @@
             <Grid x:Name="ExpandedPanel" Visibility="Hidden" Opacity="0" Margin="32,24,32,24">
                 <Grid.RenderTransform><TranslateTransform x:Name="ExpandedTranslate" Y="-4"/></Grid.RenderTransform>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="168"/>
+                    <RowDefinition Height="*"/>
                     <RowDefinition Height="13"/>
                     <RowDefinition Height="112"/>
                 </Grid.RowDefinitions>
@@ -250,7 +253,7 @@
                             <TextBlock x:Name="ExpandedMediaSubtitle" Grid.Row="2" FontSize="10.5" LineHeight="14" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis"/>
                             <Slider x:Name="MediaSeekSlider" Grid.Row="3" Style="{StaticResource MediaSeekStyle}" Visibility="Collapsed" Value="0" Margin="0,7,0,0" PreviewMouseLeftButtonUp="MediaSeekSlider_MouseLeftButtonUp"/>
                             <Grid Grid.Row="4" Margin="0,3,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="MediaPositionText" Text="0:00" FontSize="8" Foreground="{DynamicResource TertiaryTextBrush}" Typography.NumeralAlignment="Tabular"/><TextBlock x:Name="MediaDurationText" Grid.Column="1" Text="0:00" FontSize="8" Foreground="{DynamicResource TertiaryTextBrush}" Typography.NumeralAlignment="Tabular"/></Grid>
-                            <StackPanel x:Name="MediaControlsPanel" Grid.Row="5" Orientation="Horizontal" Visibility="Collapsed" Margin="-2,5,0,0">
+                            <StackPanel x:Name="MediaControlsPanel" Grid.Row="5" Orientation="Horizontal" Visibility="Collapsed" Margin="0,6,0,0">
                                 <Button x:Name="PreviousMediaButton" Style="{StaticResource IconButtonStyle}" IsEnabled="False" Click="PreviousMediaButton_Click"><Viewbox Width="14" Height="14"><Path Data="{StaticResource PreviousGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Button>
                                 <Button x:Name="PlayPauseMediaButton" Style="{StaticResource PrimaryIconButtonStyle}" Width="38" Height="38" Margin="5,0" IsEnabled="False" Click="PlayPauseMediaButton_Click"><Grid Width="17" Height="17"><Viewbox x:Name="PlayIconViewbox" Width="17" Height="17"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource OnPrimaryContainerBrush}"/></Viewbox><Viewbox x:Name="PauseIconViewbox" Width="17" Height="17" Visibility="Collapsed"><Path Data="{StaticResource PauseGeometry}" Fill="{DynamicResource OnPrimaryContainerBrush}"/></Viewbox></Grid></Button>
                                 <Button x:Name="NextMediaButton" Style="{StaticResource IconButtonStyle}" IsEnabled="False" Click="NextMediaButton_Click"><Viewbox Width="14" Height="14"><Path Data="{StaticResource NextGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Button>
@@ -275,7 +278,7 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <TextBlock x:Name="ExpandedWeekdayText" Text="Saturday" FontSize="8.5" Foreground="{DynamicResource TertiaryTextBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="ExpandedClockText" Text="13:00" FontSize="38" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" HorizontalAlignment="Center" Margin="0,-2,0,-2"/>
+                                <TextBlock x:Name="ExpandedClockText" Text="13:00" FontSize="38" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" HorizontalAlignment="Center" LineHeight="42"/>
                                 <TextBlock x:Name="ExpandedDateText" Text="Aug 22" FontSize="8.5" Foreground="{DynamicResource SecondaryTextBrush}" HorizontalAlignment="Center"/>
                             </StackPanel>
                             <Border Grid.Column="1" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,8"/>
@@ -285,7 +288,7 @@
                                 <controls:RadialMeter x:Name="RamRadialMeter" Width="50" Height="50" Label="RAM" Value="0" ProgressBrush="{DynamicResource AccentBrush}" TrackBrush="{DynamicResource DividerBrush}" TextBrush="{DynamicResource PrimaryTextBrush}" SecondaryTextBrush="{DynamicResource TertiaryTextBrush}" HorizontalAlignment="Center"/>
                             </UniformGrid>
                         </Grid>
-                                                <Grid Grid.Row="1" Margin="0,4,0,0">
+                        <Grid Grid.Row="1" Margin="0,5,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
                                 <TextBlock Text="POWER" FontSize="7.5" Foreground="{DynamicResource TertiaryTextBrush}"/>
@@ -367,9 +370,9 @@
                     <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="TIMERS" FontSize="8.5" Foreground="{DynamicResource TertiaryTextBrush}" Margin="0,0,0,4"/>
-                        <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="FocusTimerLabelText" Text="Focus" FontSize="10"/><TextBlock x:Name="FocusTimerText" Grid.Column="1" Text="25:00" FontSize="10.5" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" Margin="8,0"/><Button x:Name="FocusToggleButton" Grid.Column="2" Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Click="FocusToggleButton_Click" AutomationProperties.Name="Toggle focus timer"><Grid Width="11" Height="11"><Viewbox x:Name="FocusPlayIconViewbox" Width="11" Height="11"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox><Viewbox x:Name="FocusPauseIconViewbox" Width="11" Height="11" Visibility="Collapsed"><Path Data="{StaticResource PauseGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Grid></Button></Grid>
+                        <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="FocusTimerLabelText" Text="Focus" FontSize="10" VerticalAlignment="Center"/><TextBlock x:Name="FocusTimerText" Grid.Column="1" Text="25:00" FontSize="10.5" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" Margin="8,0" VerticalAlignment="Center"/><Button x:Name="FocusToggleButton" Grid.Column="2" Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Click="FocusToggleButton_Click" AutomationProperties.Name="Toggle focus timer"><Grid Width="11" Height="11"><Viewbox x:Name="FocusPlayIconViewbox" Width="11" Height="11"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox><Viewbox x:Name="FocusPauseIconViewbox" Width="11" Height="11" Visibility="Collapsed"><Path Data="{StaticResource PauseGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Grid></Button></Grid>
                         <ProgressBar x:Name="FocusTimerProgressBar" Grid.Row="2" Style="{StaticResource MediaProgressStyle}" Minimum="0" Maximum="1" Value="0" Height="3" Margin="0,1,30,2" Visibility="Collapsed" IsHitTestVisible="False"/>
-                        <Grid Grid.Row="3" Margin="0,1,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Break" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}"/><TextBlock Text="45:00" Grid.Column="1" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" Typography.NumeralAlignment="Tabular" Margin="8,0"/><Button Grid.Column="2" Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Click="Break45Button_Click"><Viewbox Width="11" Height="11"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource SecondaryTextBrush}"/></Viewbox></Button></Grid>
+                        <Grid Grid.Row="3" Margin="0,1,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Break" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" VerticalAlignment="Center"/><TextBlock Text="45:00" Grid.Column="1" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" Typography.NumeralAlignment="Tabular" Margin="8,0" VerticalAlignment="Center"/><Button Grid.Column="2" Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Click="Break45Button_Click"><Viewbox Width="11" Height="11"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource SecondaryTextBrush}"/></Viewbox></Button></Grid>
                     </Grid>
 
                     <Border x:Name="DownloadLeadingSeparator" Grid.Column="1" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,3"/>

@@ -67,7 +67,7 @@
                                                          To="1"
                                                          Duration="0:0:0.11">
                                             <DoubleAnimation.EasingFunction>
-                                                <PowerEase Power="2.2" EasingMode="EaseOut"/>
+                                                <SineEase EasingMode="EaseInOut"/>
                                             </DoubleAnimation.EasingFunction>
                                         </DoubleAnimation>
                                     </Storyboard>
@@ -81,7 +81,7 @@
                                                          To="0"
                                                          Duration="0:0:0.10">
                                             <DoubleAnimation.EasingFunction>
-                                                <PowerEase Power="2.2" EasingMode="EaseOut"/>
+                                                <SineEase EasingMode="EaseInOut"/>
                                             </DoubleAnimation.EasingFunction>
                                         </DoubleAnimation>
                                     </Storyboard>

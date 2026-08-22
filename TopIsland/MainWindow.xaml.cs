@@ -41,7 +41,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _discordTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _peekTimer = new();
     private readonly DispatcherTimer _collapseTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
-    private readonly DispatcherTimer _pointerTimer = new() { Interval = TimeSpan.FromMilliseconds(40) };
+    private readonly DispatcherTimer _pointerTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
     private readonly SemaphoreSlim _mediaRefreshGate = new(1, 1);
     private readonly SemaphoreSlim _notificationRefreshGate = new(1, 1);
     private readonly SemaphoreSlim _discordRefreshGate = new(1, 1);
@@ -63,28 +63,38 @@ public partial class MainWindow : Window
     private long _monitorTransitionSerial;
     private bool _externalBlurAvailable;
     private bool _windowTransitionActive;
-    private DateTime _windowTransitionStartedAt;
+    private long _windowTransitionStartedTimestamp;
     private int _windowTransitionDurationMs;
     private double _windowFromWidth;
     private double _windowFromHeight;
     private double _windowFromTopDip;
     private double _windowFromShapeProgress;
+    private double _windowFromRevealProgress;
+    private double _windowFromSurfaceOpacity;
+    private double _windowFromCompactOpacity;
+    private double _windowFromExpandedOpacity;
+    private double _windowFromExpandedTranslate;
+    private double _windowFromShadowBlur;
+    private double _windowFromShadowOpacity;
     private double _windowToWidth;
     private double _windowToHeight;
     private double _windowToTopDip;
     private double _windowToShapeProgress;
+    private double _windowToRevealProgress;
+    private double _windowToSurfaceOpacity;
+    private double _windowToCompactOpacity;
+    private double _windowToExpandedOpacity;
+    private double _windowToExpandedTranslate;
+    private double _windowToShadowBlur;
+    private double _windowToShadowOpacity;
+    private double _renderedWidth;
+    private double _renderedHeight;
     private double _currentTopDip;
     private double _shapeExpansionProgress;
-    private readonly DispatcherTimer _transitionGuardTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
-    private long _visualTransitionSerial;
+    private readonly DispatcherTimer _transitionGuardTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private bool _pointerWasInside;
     private bool _edgeRevealVisualHidden;
     private double _edgeRevealProgress = 1.0;
-    private bool _edgeRevealTransitionActive;
-    private DateTime _edgeRevealTransitionStartedAt;
-    private int _edgeRevealTransitionDurationMs;
-    private double _edgeRevealFromProgress = 1.0;
-    private double _edgeRevealToProgress = 1.0;
 
     public event EventHandler? SettingsChanged;
 
@@ -108,9 +118,12 @@ public partial class MainWindow : Window
         _discordTimer.Tick += DiscordTimer_Tick;
         SizeChanged += (_, _) =>
         {
-            UpdateGeometry();
+            // During a coordinated transition the render driver owns geometry,
+            // size and position together. Recomputing from the delayed WPF
+            // ActualWidth/ActualHeight here would put the clip one frame behind.
             if (!_windowTransitionActive)
             {
+                UpdateGeometry();
                 PositionOnCurrentMonitor();
             }
         };
@@ -148,7 +161,6 @@ public partial class MainWindow : Window
         _collapseTimer.Stop();
         _pointerTimer.Stop();
         _transitionGuardTimer.Stop();
-        StopEdgeRevealTransition();
         _blurHostService.Dispose();
         _statsService.Dispose();
         _hardwareTelemetryService?.Dispose();

@@ -1,15 +1,10 @@
-using System.IO;
-using System.Runtime.InteropServices;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Effects;
-using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 using TopIsland.Controls;
-using TopIsland.Interop;
 using TopIsland.Models;
 using TopIsland.Services;
 
@@ -27,7 +22,7 @@ public partial class MainWindow
     {
         // A native resize can synthesize MouseLeave even while the real pointer
         // is still over the island. Never collapse directly from this event; the
-        // 40 ms pointer tracker validates the actual screen-space cursor first.
+        // 16 ms pointer tracker validates the actual screen-space cursor first.
         _peekTimer.Stop();
     }
 
@@ -80,7 +75,7 @@ public partial class MainWindow
         // edge; this grace period absorbs transient leave events during morphs.
         _collapseTimer.Interval = _state == SurfaceState.Expanded
             ? TimeSpan.FromMilliseconds(260)
-            : TimeSpan.FromMilliseconds(55);
+            : TimeSpan.FromMilliseconds(100);
         _collapseTimer.Start();
     }
 
@@ -172,198 +167,81 @@ public partial class MainWindow
 
     private void ApplyState(bool immediate = false)
     {
-        var transitionSerial = ++_visualTransitionSerial;
         var target = ResolveLayout(_state);
         var duration = immediate ? 0 : _state switch
         {
-            SurfaceState.Expanded => 200,
-            SurfaceState.Idle => 165,
-            SurfaceState.Peek => 130,
-            _ => 95
+            SurfaceState.Expanded => 235,
+            SurfaceState.Idle => 205,
+            SurfaceState.Peek => 180,
+            _ => 165
         };
 
-        UpdateSecondaryPollingState();
-
-        if (_state == SurfaceState.Expanded)
+        var edgeHidden = _settings.RevealOnTopEdge && _state == SurfaceState.Idle;
+        if (!immediate && _settings.Style == IslandStyle.Notch && !edgeHidden && _edgeRevealProgress < 0.92)
         {
-            if (immediate)
-            {
-                CompactBar.Visibility = Visibility.Hidden;
-                CompactBar.Opacity = 0;
-                ExpandedTranslate.Y = 0;
-            }
-            else
-            {
-                AnimateOpacity(CompactBar, 0, 50, 0, hideOnComplete: true);
-                ExpandedTranslate.Y = -4;
-            }
+            // Top-edge reveal is intentionally a little more deliberate than a
+            // normal hover resize, but every property still shares one timeline.
+            duration = Math.Max(duration, 225);
+        }
 
-            ExpandedPanel.Visibility = Visibility.Visible;
-            AnimateOpacity(ExpandedPanel, 1, immediate ? 0 : 135, immediate ? 0 : 20);
-            AnimateTranslate(ExpandedTranslate, 0, immediate ? 0 : 150, immediate ? 0 : 12);
-        }
-        else
-        {
-            if (immediate || _shapeExpansionProgress < 0.35)
-            {
-                ApplyCompactContent(immediate);
-            }
-            else
-            {
-                // Keep expanded content while the large shell begins to contract.
-                // This prevents a large window with tiny compact content if a native
-                // resize is interrupted. The serial makes stale delayed swaps harmless.
-                _ = SwapToCompactContentAfterDelayAsync(transitionSerial, Math.Max(40, (int)(duration * 0.34)));
-            }
-        }
+        // Do not start/stop secondary data sources here. A newly completed
+        // notification/Discord query can change column visibility while the HWND
+        // is mid-resize, which reads as a dropped frame. Polling is reconciled on
+        // the final motion frame instead.
+
+        // Both content trees stay alive during a transition. Their opacities are
+        // driven from the exact same frame progress as the shell, eliminating the
+        // delayed async swap that used to visibly pop midway through a resize.
+        CompactBar.Visibility = Visibility.Visible;
+        ExpandedPanel.Visibility = Visibility.Visible;
 
         SurfacePath.SetResourceReference(System.Windows.Shapes.Path.FillProperty,
             _state is SurfaceState.Hover or SurfaceState.Peek ? "SurfaceHoverBrush" : "SurfaceBrush");
 
-        ApplyEdgeRevealVisual(immediate);
-        var edgeHidden = _settings.RevealOnTopEdge && _state == SurfaceState.Idle;
+        _edgeRevealVisualHidden = edgeHidden;
+        Root.IsHitTestVisible = !edgeHidden;
+
+        var targetReveal = _settings.Style == IslandStyle.Notch
+            ? edgeHidden ? 0.0 : 1.0
+            : 1.0;
+        var targetSurfaceOpacity = _settings.Style == IslandStyle.Notch
+            ? 1.0
+            : edgeHidden ? 0.0 : 1.0;
+        var targetCompactOpacity = _state == SurfaceState.Expanded ? 0.0 : 1.0;
+        var targetExpandedOpacity = _state == SurfaceState.Expanded ? 1.0 : 0.0;
+        var targetExpandedTranslate = _state == SurfaceState.Expanded ? 0.0 : -4.0;
+
         var shadowOpacity = edgeHidden ? 0.0 : _state switch
         {
             SurfaceState.Idle => _settings.Style == IslandStyle.Notch ? 0.0 : 0.16,
             SurfaceState.Expanded => _settings.Style == IslandStyle.Notch ? 0.34 : 0.30,
             _ => _settings.Style == IslandStyle.Notch ? 0.26 : 0.24
         };
-        var shadowBlur = _state switch
-        {
-            SurfaceState.Idle => 8.0,
-            SurfaceState.Expanded => 12.0,
-            _ => 10.0
-        };
-        AnimateShadow(shadowBlur, shadowOpacity, immediate);
+        // Animating DropShadowEffect.BlurRadius forces an expensive effect
+        // re-rasterization every frame for almost no perceptual benefit. Keep the
+        // kernel stable and animate only shadow opacity on the shared timeline.
+        const double shadowBlur = 10.0;
 
         ConfigureContentMargins();
-        UpdateCompactDensity();
-        AnimateWindow(target.Width, target.Height, target.Top, duration);
-        UpdateGeometry();
-    }
-
-    private void ApplyEdgeRevealVisual(bool immediate)
-    {
-        var hidden = _settings.RevealOnTopEdge && _state == SurfaceState.Idle;
-        _edgeRevealVisualHidden = hidden;
-        Root.IsHitTestVisible = !hidden;
-
-        if (_settings.Style != IslandStyle.Notch)
+        // When expanding, keep the currently visible compact composition intact
+        // until it has fully cross-faded out. On collapse, configure compact
+        // density before it fades in so no items pop into existence halfway.
+        if (_state != SurfaceState.Expanded)
         {
-            // Dynamic Island remains a floating surface, so retain its opacity
-            // treatment. The screen-edge growth animation below is specifically
-            // designed around the notch's inverse-R shoulders at y=0.
-            StopEdgeRevealTransition();
-            _edgeRevealProgress = 1.0;
-            var targetOpacity = hidden ? 0.0 : 1.0;
-            if (immediate)
-            {
-                SurfacePath.BeginAnimation(OpacityProperty, null);
-                ContentHost.BeginAnimation(OpacityProperty, null);
-                SurfacePath.Opacity = targetOpacity;
-                ContentHost.Opacity = targetOpacity;
-                UpdateGeometry();
-                return;
-            }
-
-            AnimateOpacity(SurfacePath, targetOpacity, hidden ? 110 : 145, 0);
-            AnimateOpacity(ContentHost, targetOpacity, hidden ? 85 : 135, hidden ? 0 : 12);
-            return;
+            UpdateCompactDensity();
         }
-
-        // A notch must not fade in from nowhere. Keep the surface fully opaque
-        // and animate the geometry itself from the physical top edge downward.
-        // ContentHost shares the same clip, so its contents are revealed by the
-        // growing shell rather than by an unrelated opacity animation.
-        SurfacePath.BeginAnimation(OpacityProperty, null);
-        ContentHost.BeginAnimation(OpacityProperty, null);
-        SurfacePath.Opacity = 1.0;
-        ContentHost.Opacity = 1.0;
-        StartEdgeRevealTransition(hidden ? 0.0 : 1.0, immediate);
-    }
-
-    private void StartEdgeRevealTransition(double targetProgress, bool immediate)
-    {
-        targetProgress = Math.Clamp(targetProgress, 0, 1);
-        StopEdgeRevealTransition();
-
-        if (immediate || Math.Abs(targetProgress - _edgeRevealProgress) < 0.001)
-        {
-            _edgeRevealProgress = targetProgress;
-            UpdateGeometry();
-            return;
-        }
-
-        _edgeRevealFromProgress = _edgeRevealProgress;
-        _edgeRevealToProgress = targetProgress;
-        _edgeRevealTransitionDurationMs = targetProgress > _edgeRevealFromProgress ? 245 : 165;
-        _edgeRevealTransitionStartedAt = DateTime.UtcNow;
-        _edgeRevealTransitionActive = true;
-        CompositionTarget.Rendering += EdgeRevealTransition_Rendering;
-    }
-
-    private void EdgeRevealTransition_Rendering(object? sender, EventArgs e)
-    {
-        if (!_edgeRevealTransitionActive)
-        {
-            return;
-        }
-
-        var elapsedMs = (DateTime.UtcNow - _edgeRevealTransitionStartedAt).TotalMilliseconds;
-        var t = Math.Clamp(elapsedMs / _edgeRevealTransitionDurationMs, 0, 1);
-        var revealing = _edgeRevealToProgress > _edgeRevealFromProgress;
-        var amount = revealing
-            ? EdgeRevealProfile.EaseReveal(t)
-            : 1.0 - EdgeRevealProfile.EaseHide(t);
-
-        _edgeRevealProgress = Lerp(_edgeRevealFromProgress, _edgeRevealToProgress, amount);
-        UpdateGeometry();
-
-        if (t < 1)
-        {
-            return;
-        }
-
-        _edgeRevealProgress = _edgeRevealToProgress;
-        StopEdgeRevealTransition();
-        UpdateGeometry();
-    }
-
-    private void StopEdgeRevealTransition()
-    {
-        if (!_edgeRevealTransitionActive)
-        {
-            return;
-        }
-
-        CompositionTarget.Rendering -= EdgeRevealTransition_Rendering;
-        _edgeRevealTransitionActive = false;
-    }
-
-    private void ApplyCompactContent(bool immediate)
-    {
-        AnimateOpacity(ExpandedPanel, 0, immediate ? 0 : 65, 0, hideOnComplete: true);
-        AnimateTranslate(ExpandedTranslate, -4, immediate ? 0 : 75, 0);
-        CompactBar.Visibility = Visibility.Visible;
-        if (immediate)
-        {
-            CompactBar.BeginAnimation(OpacityProperty, null);
-            CompactBar.Opacity = 1;
-        }
-        else
-        {
-            AnimateOpacity(CompactBar, 1, 90, 0);
-        }
-    }
-
-    private async Task SwapToCompactContentAfterDelayAsync(long transitionSerial, int delayMs)
-    {
-        await Task.Delay(delayMs);
-        if (transitionSerial != _visualTransitionSerial || _state == SurfaceState.Expanded)
-        {
-            return;
-        }
-        await Dispatcher.InvokeAsync(() => ApplyCompactContent(immediate: false));
+        AnimateSurface(
+            target.Width,
+            target.Height,
+            target.Top,
+            duration,
+            targetReveal,
+            targetSurfaceOpacity,
+            targetCompactOpacity,
+            targetExpandedOpacity,
+            targetExpandedTranslate,
+            shadowBlur,
+            shadowOpacity);
     }
 
     private void TransitionGuardTimer_Tick(object? sender, EventArgs e)
@@ -375,8 +253,8 @@ public partial class MainWindow
 
         if (_windowTransitionActive)
         {
-            var elapsed = (DateTime.UtcNow - _windowTransitionStartedAt).TotalMilliseconds;
-            if (elapsed > _windowTransitionDurationMs + 250)
+            var elapsed = Stopwatch.GetElapsedTime(_windowTransitionStartedTimestamp).TotalMilliseconds;
+            if (elapsed > _windowTransitionDurationMs + 500)
             {
                 CompleteWindowTransition();
             }
@@ -386,19 +264,13 @@ public partial class MainWindow
         var target = ResolveLayout(_state);
         var actualWidth = ActualWidth > 1 ? ActualWidth : Width;
         var actualHeight = ActualHeight > 1 ? ActualHeight : Height;
-        if (Math.Abs(actualWidth - target.Width) > 1.5 || Math.Abs(actualHeight - target.Height) > 1.5)
+        if (Math.Abs(actualWidth - target.Width) > 2.5 || Math.Abs(actualHeight - target.Height) > 2.5)
         {
-            // A native resize should never leave a half-transition as a stable state.
-            _targetTopDip = target.Top;
-            _currentTopDip = target.Top;
-            _shapeExpansionProgress = _state == SurfaceState.Expanded ? 1 : 0;
-            Width = target.Width;
-            Height = target.Height;
-            _monitorService.PositionAndSizeWindow(_hwnd, _currentMonitor, target.Top, target.Width, target.Height);
-            UpdateGeometry();
+            // Recovery only. Normal completion already lands every property on
+            // the same final frame, so the guard must not periodically overwrite
+            // content opacity/position while another visual is settling.
+            ApplyState(immediate: true);
         }
-
-        ReconcileContentWithState();
     }
 
     private void ReconcileContentWithState()
@@ -442,72 +314,100 @@ public partial class MainWindow
     private double ResolveBaseSurfaceWidth(double screenWidth) =>
         IslandLayoutCalculator.ResolveBaseSurfaceWidth(_settings, screenWidth);
 
-    private void AnimateWindow(double targetWidth, double targetHeight, double targetTop, int durationMs)
+    private void AnimateSurface(
+        double targetWidth,
+        double targetHeight,
+        double targetTop,
+        int durationMs,
+        double targetReveal,
+        double targetSurfaceOpacity,
+        double targetCompactOpacity,
+        double targetExpandedOpacity,
+        double targetExpandedTranslate,
+        double targetShadowBlur,
+        double targetShadowOpacity)
     {
         var targetShapeProgress = _state == SurfaceState.Expanded ? 1.0 : 0.0;
         _targetTopDip = targetTop;
 
-        var renderedState = CaptureRenderedWindowState();
+        var fromWidth = _renderedWidth > 1
+            ? _renderedWidth
+            : ActualWidth > 1 ? ActualWidth : Width;
+        var fromHeight = _renderedHeight > 1
+            ? _renderedHeight
+            : ActualHeight > 1 ? ActualHeight : Height;
+        var fromTop = _currentTopDip;
+        var fromShape = _shapeExpansionProgress;
+        var fromReveal = _edgeRevealProgress;
+        var fromSurfaceOpacity = SurfacePath.Opacity;
+        var fromCompactOpacity = CompactBar.Opacity;
+        var fromExpandedOpacity = ExpandedPanel.Opacity;
+        var fromExpandedTranslate = ExpandedTranslate.Y;
+        var fromShadowBlur = SurfaceShadow.BlurRadius;
+        var fromShadowOpacity = SurfaceShadow.Opacity;
+
         StopWindowTransition();
 
-        if (durationMs <= 0 || _hwnd == IntPtr.Zero || _currentMonitor is null)
-        {
-            BeginAnimation(WidthProperty, null);
-            BeginAnimation(HeightProperty, null);
-            _shapeExpansionProgress = targetShapeProgress;
-            _currentTopDip = targetTop;
-            Width = targetWidth;
-            Height = targetHeight;
-            if (_hwnd != IntPtr.Zero && _currentMonitor is not null)
-            {
-                _monitorService.PositionAndSizeWindow(_hwnd, _currentMonitor, targetTop, targetWidth, targetHeight);
-            }
-            UpdateGeometry();
-            return;
-        }
+        _windowFromWidth = fromWidth;
+        _windowFromHeight = fromHeight;
+        _windowFromTopDip = fromTop;
+        _windowFromShapeProgress = fromShape;
+        _windowFromRevealProgress = fromReveal;
+        _windowFromSurfaceOpacity = fromSurfaceOpacity;
+        _windowFromCompactOpacity = fromCompactOpacity;
+        _windowFromExpandedOpacity = fromExpandedOpacity;
+        _windowFromExpandedTranslate = fromExpandedTranslate;
+        _windowFromShadowBlur = fromShadowBlur;
+        _windowFromShadowOpacity = fromShadowOpacity;
 
-        _windowFromWidth = renderedState.Width;
-        _windowFromHeight = renderedState.Height;
-        _windowFromTopDip = renderedState.Top;
-        _windowFromShapeProgress = renderedState.ShapeProgress;
         _windowToWidth = targetWidth;
         _windowToHeight = targetHeight;
         _windowToTopDip = targetTop;
         _windowToShapeProgress = targetShapeProgress;
-        // Short reversals should not restart a full-length animation. Scale the
-        // duration by the remaining distance while keeping normal transitions
-        // comfortably readable.
-        var widthDelta = _windowToWidth - _windowFromWidth;
-        var heightDelta = _windowToHeight - _windowFromHeight;
-        _windowTransitionDurationMs = MotionProfile.ScaleDuration(durationMs, widthDelta, heightDelta);
-        _windowTransitionStartedAt = DateTime.UtcNow;
+        _windowToRevealProgress = targetReveal;
+        _windowToSurfaceOpacity = targetSurfaceOpacity;
+        _windowToCompactOpacity = targetCompactOpacity;
+        _windowToExpandedOpacity = targetExpandedOpacity;
+        _windowToExpandedTranslate = targetExpandedTranslate;
+        _windowToShadowBlur = targetShadowBlur;
+        _windowToShadowOpacity = targetShadowOpacity;
+
+        var visualDelta = new[]
+        {
+            Math.Abs(_windowToShapeProgress - _windowFromShapeProgress),
+            Math.Abs(_windowToRevealProgress - _windowFromRevealProgress),
+            Math.Abs(_windowToSurfaceOpacity - _windowFromSurfaceOpacity),
+            Math.Abs(_windowToCompactOpacity - _windowFromCompactOpacity),
+            Math.Abs(_windowToExpandedOpacity - _windowFromExpandedOpacity),
+            Math.Abs(_windowToShadowOpacity - _windowFromShadowOpacity)
+        }.Max();
+
+        _windowTransitionDurationMs = MotionProfile.ScaleDuration(
+            durationMs,
+            _windowToWidth - _windowFromWidth,
+            _windowToHeight - _windowFromHeight,
+            visualDelta);
+
+        if (durationMs <= 0 || _hwnd == IntPtr.Zero || _currentMonitor is null)
+        {
+            ApplySurfaceMotionFrame(1.0);
+            _windowTransitionActive = false;
+            Width = targetWidth;
+            Height = targetHeight;
+            ReconcileContentWithState();
+            UpdateCompactDensity();
+            UpdateSecondaryPollingState();
+            return;
+        }
+
         if (_backdropResult.NativeApplied && _settings.Material != SurfaceMaterial.Solid)
         {
             _windowRegionService.Reset(this);
         }
+
+        _windowTransitionStartedTimestamp = Stopwatch.GetTimestamp();
         _windowTransitionActive = true;
         CompositionTarget.Rendering += WindowTransition_Rendering;
-    }
-
-    private (double Width, double Height, double Top, double ShapeProgress) CaptureRenderedWindowState()
-    {
-        if (!_windowTransitionActive || _windowTransitionDurationMs <= 0)
-        {
-            return (
-                ActualWidth > 1 ? ActualWidth : Width,
-                ActualHeight > 1 ? ActualHeight : Height,
-                _currentTopDip,
-                _shapeExpansionProgress);
-        }
-
-        var elapsedMs = (DateTime.UtcNow - _windowTransitionStartedAt).TotalMilliseconds;
-        var progress = Math.Clamp(elapsedMs / _windowTransitionDurationMs, 0, 1);
-        var eased = MotionProfile.Ease(progress);
-        return (
-            Lerp(_windowFromWidth, _windowToWidth, eased),
-            Lerp(_windowFromHeight, _windowToHeight, eased),
-            Lerp(_windowFromTopDip, _windowToTopDip, eased),
-            Lerp(_windowFromShapeProgress, _windowToShapeProgress, eased));
     }
 
     private void WindowTransition_Rendering(object? sender, EventArgs e)
@@ -518,24 +418,79 @@ public partial class MainWindow
             return;
         }
 
-        var elapsedMs = (DateTime.UtcNow - _windowTransitionStartedAt).TotalMilliseconds;
-        var t = Math.Clamp(elapsedMs / _windowTransitionDurationMs, 0, 1);
-        // The shell and WPF content share the same responsive ease-out curve.
-        // This avoids the sluggish first half of symmetric ease-in-out motion.
-        var eased = MotionProfile.Ease(t);
-        var width = Lerp(_windowFromWidth, _windowToWidth, eased);
-        var height = Lerp(_windowFromHeight, _windowToHeight, eased);
-        _currentTopDip = Lerp(_windowFromTopDip, _windowToTopDip, eased);
-        _shapeExpansionProgress = Lerp(_windowFromShapeProgress, _windowToShapeProgress, eased);
+        var elapsedMs = Stopwatch.GetElapsedTime(_windowTransitionStartedTimestamp).TotalMilliseconds;
+        var t = Math.Clamp(elapsedMs / Math.Max(1, _windowTransitionDurationMs), 0, 1);
+        ApplySurfaceMotionFrame(MotionProfile.Ease(t));
 
-        _monitorService.PositionAndSizeWindow(_hwnd, _currentMonitor, _currentTopDip, width, height);
-
-        if (t < 1)
+        if (t >= 1)
         {
-            return;
+            CompleteWindowTransition();
+        }
+    }
+
+    private void ApplySurfaceMotionFrame(double amount)
+    {
+        var width = Lerp(_windowFromWidth, _windowToWidth, amount);
+        var height = Lerp(_windowFromHeight, _windowToHeight, amount);
+        _renderedWidth = width;
+        _renderedHeight = height;
+        _currentTopDip = Lerp(_windowFromTopDip, _windowToTopDip, amount);
+        _shapeExpansionProgress = Lerp(_windowFromShapeProgress, _windowToShapeProgress, amount);
+        _edgeRevealProgress = Lerp(_windowFromRevealProgress, _windowToRevealProgress, amount);
+
+        var surfaceOpacity = Lerp(_windowFromSurfaceOpacity, _windowToSurfaceOpacity, amount);
+        SurfacePath.Opacity = surfaceOpacity;
+        ContentHost.Opacity = surfaceOpacity;
+        var isCleanExpand = _windowFromCompactOpacity > 0.98
+                            && _windowToCompactOpacity < 0.02
+                            && _windowFromExpandedOpacity < 0.02
+                            && _windowToExpandedOpacity > 0.98;
+        var isCleanCollapse = _windowFromCompactOpacity < 0.02
+                              && _windowToCompactOpacity > 0.98
+                              && _windowFromExpandedOpacity > 0.98
+                              && _windowToExpandedOpacity < 0.02;
+
+        if (isCleanExpand)
+        {
+            // One master timeline with a soft gamma cross-fade. Both trees are
+            // present around the midpoint, but neither reaches 50% opacity there,
+            // avoiding both the old double-image and the temporary blank band.
+            CompactBar.Opacity = Math.Pow(1.0 - amount, 1.45);
+            ExpandedPanel.Opacity = Math.Pow(amount, 1.45);
+        }
+        else if (isCleanCollapse)
+        {
+            ExpandedPanel.Opacity = Math.Pow(1.0 - amount, 1.45);
+            CompactBar.Opacity = Math.Pow(amount, 1.45);
+        }
+        else
+        {
+            // Interrupted/reversed transitions continue from the exact rendered
+            // values rather than snapping back onto a canned cross-fade curve.
+            CompactBar.Opacity = Lerp(_windowFromCompactOpacity, _windowToCompactOpacity, amount);
+            ExpandedPanel.Opacity = Lerp(_windowFromExpandedOpacity, _windowToExpandedOpacity, amount);
         }
 
-        CompleteWindowTransition();
+        ExpandedTranslate.Y = Lerp(_windowFromExpandedTranslate, _windowToExpandedTranslate, amount);
+        SurfaceShadow.BlurRadius = Lerp(_windowFromShadowBlur, _windowToShadowBlur, amount);
+        SurfaceShadow.Opacity = Lerp(_windowFromShadowOpacity, _windowToShadowOpacity, amount);
+
+        // Let WPF own the size change so its measure/arrange pass and the HWND
+        // resize stay in the same pipeline. Native SetWindowPos used to resize
+        // the HWND immediately while WPF content was still on the previous
+        // layout for one frame, producing the visible "blank enlarged shell".
+        SetCurrentValue(WidthProperty, width);
+        SetCurrentValue(HeightProperty, height);
+        // CompositionTarget.Rendering runs after the normal layout pass. Force
+        // the invalidated layout now so the shell and its arranged content are
+        // committed to the same rendered frame instead of trailing by one frame.
+        UpdateLayout();
+        if (_hwnd != IntPtr.Zero && _currentMonitor is not null)
+        {
+            _monitorService.PositionWindow(_hwnd, _currentMonitor, _currentTopDip);
+        }
+
+        UpdateGeometry(width, height);
     }
 
     private void CompleteWindowTransition()
@@ -546,16 +501,23 @@ public partial class MainWindow
             return;
         }
 
+        ApplySurfaceMotionFrame(1.0);
         StopWindowTransition();
+        _renderedWidth = _windowToWidth;
+        _renderedHeight = _windowToHeight;
         _currentTopDip = _windowToTopDip;
         _shapeExpansionProgress = _windowToShapeProgress;
+        _edgeRevealProgress = _windowToRevealProgress;
+
         BeginAnimation(WidthProperty, null);
         BeginAnimation(HeightProperty, null);
         Width = _windowToWidth;
         Height = _windowToHeight;
         _monitorService.PositionAndSizeWindow(_hwnd, _currentMonitor, _currentTopDip, _windowToWidth, _windowToHeight);
-        UpdateGeometry();
+        UpdateGeometry(_windowToWidth, _windowToHeight);
         ReconcileContentWithState();
+        UpdateCompactDensity();
+        UpdateSecondaryPollingState();
     }
 
     private void StopWindowTransition()
@@ -573,106 +535,15 @@ public partial class MainWindow
 
     private static IEasingFunction CreateMotionEasing() => MotionProfile.CreateWpfEasing();
 
-    private static void AnimateOpacity(UIElement element, double to, int durationMs, int delayMs, bool hideOnComplete = false)
-    {
-        var from = element.Opacity;
-        element.BeginAnimation(OpacityProperty, null);
-        element.Opacity = from;
-        if (durationMs <= 0)
-        {
-            element.Opacity = to;
-            if (hideOnComplete && to <= 0) element.Visibility = Visibility.Hidden;
-            return;
-        }
-
-        var animation = new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(durationMs))
-        {
-            BeginTime = TimeSpan.FromMilliseconds(delayMs),
-            EasingFunction = CreateMotionEasing(),
-            FillBehavior = FillBehavior.Stop
-        };
-        animation.Completed += (_, _) =>
-        {
-            element.BeginAnimation(OpacityProperty, null);
-            element.Opacity = to;
-            if (hideOnComplete && to <= 0.01) element.Visibility = Visibility.Hidden;
-        };
-        element.BeginAnimation(OpacityProperty, animation);
-    }
-
-    private static void AnimateTranslate(TranslateTransform transform, double to, int durationMs, int delayMs)
-    {
-        var from = transform.Y;
-        transform.BeginAnimation(TranslateTransform.YProperty, null);
-        transform.Y = from;
-        if (durationMs <= 0)
-        {
-            transform.Y = to;
-            return;
-        }
-
-        var animation = new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(durationMs))
-        {
-            BeginTime = TimeSpan.FromMilliseconds(delayMs),
-            EasingFunction = CreateMotionEasing(),
-            FillBehavior = FillBehavior.Stop
-        };
-        animation.Completed += (_, _) =>
-        {
-            transform.BeginAnimation(TranslateTransform.YProperty, null);
-            transform.Y = to;
-        };
-        transform.BeginAnimation(TranslateTransform.YProperty, animation);
-    }
-
-    private void AnimateShadow(double blur, double opacity, bool immediate)
-    {
-        var fromBlur = SurfaceShadow.BlurRadius;
-        var fromOpacity = SurfaceShadow.Opacity;
-        SurfaceShadow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, null);
-        SurfaceShadow.BeginAnimation(DropShadowEffect.OpacityProperty, null);
-        SurfaceShadow.BlurRadius = fromBlur;
-        SurfaceShadow.Opacity = fromOpacity;
-
-        if (immediate)
-        {
-            SurfaceShadow.BlurRadius = blur;
-            SurfaceShadow.Opacity = opacity;
-            return;
-        }
-
-        var blurAnimation = new DoubleAnimation(fromBlur, blur, TimeSpan.FromMilliseconds(110))
-        {
-            EasingFunction = CreateMotionEasing(),
-            FillBehavior = FillBehavior.Stop
-        };
-        blurAnimation.Completed += (_, _) =>
-        {
-            SurfaceShadow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, null);
-            SurfaceShadow.BlurRadius = blur;
-        };
-
-        var opacityAnimation = new DoubleAnimation(fromOpacity, opacity, TimeSpan.FromMilliseconds(110))
-        {
-            EasingFunction = CreateMotionEasing(),
-            FillBehavior = FillBehavior.Stop
-        };
-        opacityAnimation.Completed += (_, _) =>
-        {
-            SurfaceShadow.BeginAnimation(DropShadowEffect.OpacityProperty, null);
-            SurfaceShadow.Opacity = opacity;
-        };
-
-        SurfaceShadow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, blurAnimation);
-        SurfaceShadow.BeginAnimation(DropShadowEffect.OpacityProperty, opacityAnimation);
-    }
-
     private void ConfigureContentMargins()
     {
         if (_settings.Style == IslandStyle.Notch)
         {
             CompactBar.Margin = new Thickness(30, 2, 30, 0);
-            ExpandedPanel.Margin = new Thickness(47, 20, 47, 20);
+            // The notch surface ends ShadowPadding (16 DIP) above the window
+            // bottom. Add that padding to the window-side bottom margin so the
+            // content is actually 20 DIP from both visible surface edges.
+            ExpandedPanel.Margin = new Thickness(47, 20, 47, 36);
         }
         else
         {
@@ -681,16 +552,18 @@ public partial class MainWindow
         }
     }
 
-    private void UpdateGeometry()
+    private void UpdateGeometry(double? widthOverride = null, double? heightOverride = null)
     {
-        if (ActualWidth <= 1 || ActualHeight <= 1)
+        var geometryWidth = widthOverride ?? ActualWidth;
+        var geometryHeight = heightOverride ?? ActualHeight;
+        if (geometryWidth <= 1 || geometryHeight <= 1)
         {
             return;
         }
 
         var geometry = IslandGeometryFactory.Create(
             _settings.Style,
-            new Size(ActualWidth, ActualHeight),
+            new Size(geometryWidth, geometryHeight),
             _shapeExpansionProgress,
             _settings.Style == IslandStyle.Notch ? _edgeRevealProgress : 1.0);
         SurfacePath.Data = geometry;

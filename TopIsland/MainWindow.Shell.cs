@@ -304,6 +304,14 @@ public partial class MainWindow
 
     private void UpdateCompactDensity()
     {
+        // During compact -> expanded cross-fade, changing visibility inside the
+        // outgoing compact tree causes a re-measure/pop before its opacity has
+        // reached zero. Keep that tree frozen until the coordinated motion ends.
+        if (_windowTransitionActive && _state == SurfaceState.Expanded)
+        {
+            return;
+        }
+
         var baseWidth = ResolveBaseSurfaceWidth(GetTargetScreenWidthDip());
         var hoverOrPeek = _state is SurfaceState.Hover or SurfaceState.Peek;
         var peek = _state == SurfaceState.Peek;

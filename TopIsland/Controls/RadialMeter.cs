@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using TopIsland.Services;
 
 namespace TopIsland.Controls;
 
@@ -83,9 +84,9 @@ public sealed class RadialMeter : FrameworkElement
             return;
         }
 
-        var animation = new DoubleAnimation(from, target, TimeSpan.FromMilliseconds(meter.IsTachometer ? 260 : 220))
+        var animation = new DoubleAnimation(from, target, TimeSpan.FromMilliseconds(meter.IsTachometer ? 180 : 165))
         {
-            EasingFunction = new PowerEase { Power = 2.15, EasingMode = EasingMode.EaseOut },
+            EasingFunction = MotionProfile.CreateWpfEasing(),
             FillBehavior = FillBehavior.Stop
         };
         animation.Completed += (_, _) =>

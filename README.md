@@ -53,6 +53,8 @@ Notification permission is never requested automatically. If access is not alrea
 - **Peek** — reveals selected lower-priority information without opening the full surface
 - **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM, Power/Thermal and Discord voice controls (or Output/Volume when not in voice), plus Notifications when present. The lower row is Timers, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware/Uptime
 
+Surface transitions use one frame-coherent motion timeline for window size/position, shell geometry, reveal progress, compact/expanded content, and shadow opacity. State reversals resume from the currently rendered values instead of restarting independent animations, and WPF layout is synchronized with each rendered size frame to avoid one-frame shell/content lag.
+
 Smaller widths remove information instead of shrinking every label. When no download is moving, the lower middle lane shows the foreground **SESSION** (process, memory, CPU, threads and uptime); an actively changing partial download replaces that lane instead of creating another permanent card. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. Its right-edge settings gear opens the same real TopIsland context menu used by the tray/overlay. The Expanded clock remains the visual anchor above the two-row information layout.
 
 ## Screenshots
