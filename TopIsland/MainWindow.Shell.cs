@@ -284,17 +284,34 @@ public partial class MainWindow
     private void UpdateCompactDensity()
     {
         var baseWidth = ResolveBaseSurfaceWidth(GetTargetScreenWidthDip());
+        var hoverOrPeek = _state is SurfaceState.Hover or SurfaceState.Peek;
         var peek = _state == SurfaceState.Peek;
 
-        CompactMediaText.Visibility = baseWidth >= 240 ? Visibility.Visible : Visibility.Collapsed;
-        MediaSubtitleText.Visibility = baseWidth >= 600 || (peek && baseWidth >= 300)
+        CompactMediaText.Visibility = baseWidth >= 235 ? Visibility.Visible : Visibility.Collapsed;
+        MediaSubtitleText.Visibility = baseWidth >= 520 || (peek && baseWidth >= 300)
             ? Visibility.Visible
             : Visibility.Collapsed;
+
+        CompactTransportPanel.Visibility = _hasMediaSession && (baseWidth >= 500 || (peek && baseWidth >= 420))
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        CompactDateText.Visibility = baseWidth >= 500 ? Visibility.Visible : Visibility.Collapsed;
+
         var showCompactMeters = baseWidth >= 500 || (peek && baseWidth >= 360);
+        CompactMetersPanel.Visibility = showCompactMeters ? Visibility.Visible : Visibility.Collapsed;
         CompactCpuMeter.Visibility = showCompactMeters ? Visibility.Visible : Visibility.Collapsed;
         CompactRamMeter.Visibility = showCompactMeters ? Visibility.Visible : Visibility.Collapsed;
-        CompactActivityText.Visibility = !string.IsNullOrWhiteSpace(CompactActivityText.Text)
-            && (baseWidth >= 1000 || (peek && baseWidth >= 500))
+
+        FullWidthInfoPanel.Visibility = baseWidth >= 1400 ? Visibility.Visible : Visibility.Collapsed;
+
+        var showIndicators = baseWidth >= 520 || (peek && baseWidth >= 420);
+        CompactIndicatorsPanel.Visibility = showIndicators ? Visibility.Visible : Visibility.Collapsed;
+        CompactNotificationIndicator.Visibility = showIndicators && _notificationCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+        CompactDownloadIndicator.Visibility = showIndicators && _activeDownloadCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        CompactActivityText.Visibility = hoverOrPeek
+            && !string.IsNullOrWhiteSpace(CompactActivityText.Text)
+            && (baseWidth >= 520 || (peek && baseWidth >= 480))
             ? Visibility.Visible
             : Visibility.Collapsed;
     }

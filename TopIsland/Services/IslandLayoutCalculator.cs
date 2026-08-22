@@ -18,27 +18,27 @@ public static class IslandLayoutCalculator
         {
             case SurfaceState.Hover:
                 {
-                    var hoverGrowth = Math.Clamp(baseWidth * 0.04, 12, 28);
+                    var hoverGrowth = Math.Clamp(baseWidth * 0.10, 16, 64);
                     surfaceWidth = Math.Min(baseWidth + hoverGrowth, maxWidth);
-                    windowHeight = settings.Style == IslandStyle.Notch ? 56 : 72;
+                    windowHeight = settings.Style == IslandStyle.Notch ? 62 : 80;
                     break;
                 }
             case SurfaceState.Peek:
                 {
-                    var peekGrowth = Math.Clamp(baseWidth * 0.09, 24, 56);
+                    var peekGrowth = Math.Clamp(baseWidth * 0.18, 30, 112);
                     surfaceWidth = Math.Min(baseWidth + peekGrowth, maxWidth);
-                    windowHeight = settings.Style == IslandStyle.Notch ? 62 : 78;
+                    windowHeight = settings.Style == IslandStyle.Notch ? 68 : 88;
                     break;
                 }
             case SurfaceState.Expanded:
                 surfaceWidth = settings.WidthPreset == WidthPreset.FullWidth
                     ? maxWidth
-                    : Math.Min(Math.Max(baseWidth, 1320), maxWidth);
-                windowHeight = settings.Style == IslandStyle.Notch ? 382 : 398;
+                    : Math.Min(Math.Max(baseWidth, 1040), Math.Min(maxWidth, 1180));
+                windowHeight = settings.Style == IslandStyle.Notch ? 350 : 366;
                 break;
             default:
                 surfaceWidth = baseWidth;
-                windowHeight = settings.Style == IslandStyle.Notch ? 52 : 68;
+                windowHeight = settings.Style == IslandStyle.Notch ? 56 : 72;
                 break;
         }
 

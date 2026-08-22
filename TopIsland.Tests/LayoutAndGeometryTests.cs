@@ -13,7 +13,7 @@ public sealed class LayoutAndGeometryTests
         var settings = new AppSettings { Style = IslandStyle.Notch, WidthPreset = WidthPreset.Compact };
         var layout = IslandLayoutCalculator.Resolve(settings, SurfaceState.Idle, 1706.6667);
         Assert.Equal(352, layout.Width, 3);
-        Assert.Equal(52, layout.Height, 3);
+        Assert.Equal(56, layout.Height, 3);
         Assert.Equal(0, layout.Top, 3);
     }
 
@@ -22,8 +22,8 @@ public sealed class LayoutAndGeometryTests
     {
         var settings = new AppSettings { Style = IslandStyle.Notch, WidthPreset = WidthPreset.Compact };
         var layout = IslandLayoutCalculator.Resolve(settings, SurfaceState.Peek, 1706.6667);
-        Assert.Equal(380.8, layout.Width, 3);
-        Assert.Equal(62, layout.Height, 3);
+        Assert.Equal(409.6, layout.Width, 3);
+        Assert.Equal(68, layout.Height, 3);
     }
 
     [Fact]
@@ -31,8 +31,8 @@ public sealed class LayoutAndGeometryTests
     {
         var settings = new AppSettings { Style = IslandStyle.Notch, WidthPreset = WidthPreset.Compact };
         var layout = IslandLayoutCalculator.Resolve(settings, SurfaceState.Expanded, 1706.6667);
-        Assert.Equal(1352, layout.Width, 3);
-        Assert.Equal(382, layout.Height, 3);
+        Assert.Equal(1072, layout.Width, 3);
+        Assert.Equal(350, layout.Height, 3);
     }
 
     [Fact]
@@ -55,8 +55,8 @@ public sealed class LayoutAndGeometryTests
     {
         var settings = new AppSettings { Style = IslandStyle.DynamicIsland, WidthPreset = WidthPreset.Standard };
         var layout = IslandLayoutCalculator.Resolve(settings, SurfaceState.Hover, 1706.6667);
-        Assert.Equal(614.4, layout.Width, 3);
-        Assert.Equal(72, layout.Height, 3);
+        Assert.Equal(648, layout.Width, 3);
+        Assert.Equal(80, layout.Height, 3);
         Assert.Equal(10, layout.Top, 3);
     }
 

@@ -7,7 +7,14 @@ using System.Text;
 
 namespace TopIsland.Services;
 
-public sealed record ForegroundAppSnapshot(string Title, string ProcessName, byte[]? IconPng);
+public sealed record ForegroundAppSnapshot(
+    string Title,
+    string ProcessName,
+    int ProcessId,
+    long WorkingSetBytes,
+    int ThreadCount,
+    DateTimeOffset? StartedAt,
+    byte[]? IconPng);
 
 public sealed class ForegroundAppService
 {
@@ -30,11 +37,17 @@ public sealed class ForegroundAppService
             _ = GetWindowThreadProcessId(hwnd, out var processId);
 
             var processName = "Windows";
+            var workingSetBytes = 0L;
+            var threadCount = 0;
+            DateTimeOffset? startedAt = null;
             byte[]? icon = null;
             if (processId != 0)
             {
                 using var process = Process.GetProcessById((int)processId);
                 processName = process.ProcessName;
+                workingSetBytes = Math.Max(0, process.WorkingSet64);
+                try { threadCount = process.Threads.Count; } catch { threadCount = 0; }
+                try { startedAt = process.StartTime; } catch { startedAt = null; }
                 icon = TryGetIcon(process);
             }
 
@@ -49,7 +62,14 @@ public sealed class ForegroundAppService
                 title = title[..71] + "…";
             }
 
-            return new ForegroundAppSnapshot(title, processName, icon);
+            return new ForegroundAppSnapshot(
+                title,
+                processName,
+                (int)processId,
+                workingSetBytes,
+                threadCount,
+                startedAt,
+                icon);
         }
         catch
         {
@@ -93,7 +113,14 @@ public sealed class ForegroundAppService
         }
     }
 
-    private static ForegroundAppSnapshot Empty() => new("Desktop", "Windows", null);
+    private static ForegroundAppSnapshot Empty() => new(
+        "Desktop",
+        "Windows",
+        0,
+        0,
+        0,
+        null,
+        null);
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -24,49 +25,46 @@ public partial class MainWindow
         UpdateSecondaryPollingState();
     }
 
-    private bool NeedsSecondaryPolling()
+    private bool NeedsNotificationPolling()
     {
-        if (!IsVisible)
-        {
-            return false;
-        }
-
+        if (!IsVisible) return false;
         var baseWidth = ResolveBaseSurfaceWidth(GetTargetScreenWidthDip());
         return _state == SurfaceState.Expanded
-               || baseWidth >= 1000
-               || (_state == SurfaceState.Peek && baseWidth >= 500);
+               || baseWidth >= 500
+               || (_state == SurfaceState.Peek && baseWidth >= 360);
+    }
+
+    private bool NeedsDiscordPolling()
+    {
+        if (!IsVisible) return false;
+        var baseWidth = ResolveBaseSurfaceWidth(GetTargetScreenWidthDip());
+        return _state is SurfaceState.Hover or SurfaceState.Peek or SurfaceState.Expanded
+               || baseWidth >= 1400;
     }
 
     private void UpdateSecondaryPollingState(bool refreshImmediately = false)
     {
-        var shouldPoll = NeedsSecondaryPolling();
-        var isPolling = _notificationTimer.IsEnabled || _discordTimer.IsEnabled;
+        var needNotifications = NeedsNotificationPolling();
+        var needDiscord = NeedsDiscordPolling();
 
-        if (!shouldPoll)
-        {
-            _notificationTimer.Stop();
-            _discordTimer.Stop();
-            return;
-        }
+        var startNotifications = needNotifications && !_notificationTimer.IsEnabled;
+        var startDiscord = needDiscord && !_discordTimer.IsEnabled;
 
-        if (!isPolling)
-        {
-            _notificationTimer.Start();
-            _discordTimer.Start();
-            refreshImmediately = true;
-        }
+        if (needNotifications) _notificationTimer.Start(); else _notificationTimer.Stop();
+        if (needDiscord) _discordTimer.Start(); else _discordTimer.Stop();
 
-        if (refreshImmediately)
+        if (refreshImmediately || startNotifications || startDiscord)
         {
-            _ = RefreshSecondaryLiveDataAsync();
+            _ = RefreshSecondaryLiveDataAsync(needNotifications, needDiscord);
         }
     }
 
-    private async Task RefreshSecondaryLiveDataAsync()
+    private async Task RefreshSecondaryLiveDataAsync(bool refreshNotifications, bool refreshDiscord)
     {
-        await Task.WhenAll(
-            RefreshNotificationsAsync(waitForTurn: false),
-            RefreshDiscordVoiceAsync(waitForTurn: false));
+        var tasks = new List<Task>(2);
+        if (refreshNotifications) tasks.Add(RefreshNotificationsAsync(waitForTurn: false));
+        if (refreshDiscord) tasks.Add(RefreshDiscordVoiceAsync(waitForTurn: false));
+        if (tasks.Count > 0) await Task.WhenAll(tasks);
         UpdateLiveData();
     }
 
@@ -88,9 +86,12 @@ public partial class MainWindow
             var snapshot = await (_notificationService ??= new NotificationService()).SampleAsync();
             var hasVisibleNotifications = snapshot.AccessAllowed && snapshot.HasNotifications;
             _notificationCount = snapshot.AccessAllowed ? snapshot.Count : 0;
-            NotificationColumn.Width = hasVisibleNotifications ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+            NotificationColumn.MinWidth = hasVisibleNotifications ? 260 : 0;
+            NotificationColumn.Width = hasVisibleNotifications ? new GridLength(1.0, GridUnitType.Star) : new GridLength(0);
+            NotificationSeparatorColumn.Width = hasVisibleNotifications ? new GridLength(1) : new GridLength(0);
             NotificationStripGroup.Visibility = hasVisibleNotifications ? Visibility.Visible : Visibility.Collapsed;
             NotificationSeparator.Visibility = hasVisibleNotifications ? Visibility.Visible : Visibility.Collapsed;
+            CompactNotificationText.Text = _notificationCount.ToString();
 
             NotificationItem2Group.Visibility = Visibility.Collapsed;
             NotificationItem3Group.Visibility = Visibility.Collapsed;
@@ -197,13 +198,10 @@ public partial class MainWindow
             var participantText = voice.ParticipantCount > 0
                 ? $"{voice.ParticipantCount} in call"
                 : "In call";
-            var serverText = string.IsNullOrWhiteSpace(voice.ServerName)
-                ? participantText
-                : $"{voice.ServerName} \u00B7 {participantText}";
             // Keep the always-visible voice summary privacy-safe. Exact participant
-            // names remain available to the service for future opt-in/detail UI,
-            // but the surface shows only the server and observed participant count.
-            DiscordVoiceDetailText.Text = serverText;
+            // and server names remain available to the service for future opt-in/detail UI,
+            // but the surface shows only the observed participant count.
+            DiscordVoiceDetailText.Text = participantText;
             DiscordVoiceStatusText.Text = voice.IsDeafened
                 ? "Mic muted \u00B7 Audio muted"
                 : voice.IsMuted
@@ -266,13 +264,23 @@ public partial class MainWindow
         await RefreshDiscordVoiceAsync();
     }
 
+    private async void ClearNotificationsButton_Click(object sender, RoutedEventArgs e)
+    {
+        var service = _notificationService ??= new NotificationService();
+        if (service.ClearAll())
+        {
+            await RefreshNotificationsAsync();
+            UpdateLiveData();
+        }
+    }
+
     public bool NotificationsAllowed => (_notificationService ??= new NotificationService()).IsAccessAllowed();
 
     public async Task EnableNotificationsAsync()
     {
         _ = await (_notificationService ??= new NotificationService()).RequestAccessAsync();
         await RefreshNotificationsAsync();
-        if (NeedsSecondaryPolling())
+        if (NeedsNotificationPolling())
         {
             _notificationTimer.Start();
         }
@@ -290,6 +298,7 @@ public partial class MainWindow
         try
         {
             var media = await _mediaService.SampleAsync();
+            _hasMediaSession = media.HasSession;
             byte[]? artwork;
             bool isMedia;
 
@@ -317,9 +326,16 @@ public partial class MainWindow
                 ExpandedMediaSubtitle.Text = foreground.ProcessName;
             }
 
+            ContextColumn.MinWidth = isMedia ? 300 : 230;
+            ContextColumn.Width = new GridLength(isMedia ? 1.10 : 0.80, GridUnitType.Star);
+            OverviewColumn.MinWidth = isMedia ? 292 : 320;
+            OverviewColumn.Width = new GridLength(isMedia ? 1.02 : 1.18, GridUnitType.Star);
+            ExpandedArtworkBorder.Width = isMedia ? 100 : 72;
+            ExpandedArtworkBorder.Height = isMedia ? 112 : 72;
+            ExpandedArtworkBorder.CornerRadius = new CornerRadius(isMedia ? 14 : 15);
             ApplyArtwork(artwork, isMedia);
-            MediaProgressBar.Value = media.Progress;
-            MediaProgressBar.Visibility = media.HasSession ? Visibility.Visible : Visibility.Collapsed;
+            MediaSeekSlider.Value = media.Progress;
+            MediaSeekSlider.Visibility = media.HasSession ? Visibility.Visible : Visibility.Collapsed;
             MediaPositionText.Visibility = media.HasSession ? Visibility.Visible : Visibility.Collapsed;
             MediaDurationText.Visibility = media.HasSession ? Visibility.Visible : Visibility.Collapsed;
             MediaPositionText.Text = FormatMediaTime(media.Position);
@@ -330,6 +346,9 @@ public partial class MainWindow
             NextMediaButton.IsEnabled = media.HasSession;
             PlayIconViewbox.Visibility = media.IsPlaying ? Visibility.Collapsed : Visibility.Visible;
             PauseIconViewbox.Visibility = media.IsPlaying ? Visibility.Visible : Visibility.Collapsed;
+            CompactPlayIconViewbox.Visibility = media.IsPlaying ? Visibility.Collapsed : Visibility.Visible;
+            CompactPauseIconViewbox.Visibility = media.IsPlaying ? Visibility.Visible : Visibility.Collapsed;
+            UpdateCompactDensity();
         }
         finally
         {
@@ -421,6 +440,13 @@ public partial class MainWindow
         UpdateLiveData();
     }
 
+    private async void MediaSeekSlider_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_hasMediaSession) return;
+        _ = await _mediaService.SeekAsync(MediaSeekSlider.Value);
+        await RefreshMediaAsync();
+    }
+
     private async void PreviousMediaButton_Click(object sender, RoutedEventArgs e)
     {
         await _mediaService.PreviousAsync();
@@ -443,8 +469,10 @@ public partial class MainWindow
     {
         var now = DateTime.Now;
         ClockText.Text = now.ToString("HH:mm");
+        CompactDateText.Text = now.ToString("M/d");
         ExpandedClockText.Text = now.ToString("HH:mm");
-        ExpandedDateText.Text = now.ToString("M/d ddd");
+        ExpandedWeekdayText.Text = now.ToString("dddd", CultureInfo.InvariantCulture);
+        ExpandedDateText.Text = now.ToString("MMM d", CultureInfo.InvariantCulture);
 
         var stats = _statsService.Sample();
         CompactCpuMeter.Value = stats.CpuPercent;
@@ -454,6 +482,7 @@ public partial class MainWindow
         GpuRadialMeter.Value = stats.GpuPercent;
         RamRadialMeter.Value = stats.RamPercent;
         ExpandedNetworkText.Text = $"\u2193 {stats.DownloadMbps:0.0}   \u2191 {stats.UploadMbps:0.0} Mbps";
+        FullNetworkText.Text = $"\u2193 {stats.DownloadMbps:0.0}  \u2191 {stats.UploadMbps:0.0}";
         if (_state == SurfaceState.Expanded)
         {
             _hardwareTelemetryService ??= new HardwareTelemetryService();
@@ -461,8 +490,14 @@ public partial class MainWindow
             var thermal = new List<string>();
             if (hardware.CpuTemperatureC is double cpuTemp) thermal.Add($"CPU {cpuTemp:0}\u00B0C");
             if (hardware.GpuTemperatureC is double gpuTemp) thermal.Add($"GPU {gpuTemp:0}\u00B0C");
-            thermal.Add(hardware.PowerMode);
-            HardwareDetailText.Text = string.Join(" \u00B7 ", thermal);
+            HardwareDetailText.Text = thermal.Count > 0
+                ? string.Join(" \u00B7 ", thermal)
+                : "Temperature unavailable";
+
+            var overviewHardware = new List<string> { hardware.PowerMode };
+            if (stats.HasBattery) overviewHardware.Add($"Battery {stats.BatteryPercent:0}%");
+            else if (hardware.GpuTemperatureC is double overviewGpuTemp) overviewHardware.Add($"GPU {overviewGpuTemp:0}\u00B0C");
+            OverviewHardwareText.Text = string.Join(" \u00B7 ", overviewHardware);
         }
         else if (_hardwareTelemetryService is not null)
         {
@@ -474,24 +509,42 @@ public partial class MainWindow
         {
             var used = Math.Max(0, stats.StorageTotalBytes - stats.StorageFreeBytes);
             StorageText.Text = $"{FormatBytes(stats.StorageFreeBytes)} free / {FormatBytes(stats.StorageTotalBytes)}";
+            FullStorageText.Text = $"{FormatBytes(stats.StorageFreeBytes)} free";
             StorageProgressBar.Value = Math.Clamp((double)used / stats.StorageTotalBytes, 0, 1);
         }
         else
         {
             StorageText.Text = "Unavailable";
+            FullStorageText.Text = "Unavailable";
             StorageProgressBar.Value = 0;
         }
 
         BatteryStripGroup.Visibility = stats.HasBattery ? Visibility.Visible : Visibility.Collapsed;
-        BatterySeparator.Visibility = stats.HasBattery ? Visibility.Visible : Visibility.Collapsed;
-        BatteryColumn.Width = stats.HasBattery ? new GridLength(120) : new GridLength(0);
+        BatterySeparator.Visibility = Visibility.Collapsed;
         if (stats.HasBattery)
         {
             BatteryText.Text = $"{stats.BatteryPercent:0}%";
             BatteryStateText.Text = stats.BatteryCharging ? "Charging" : "On battery";
         }
 
+        var session = _foregroundAppService.Sample();
+        SessionProcessText.Text = session.ProcessName;
+        var sessionDetails = new List<string>();
+        if (session.WorkingSetBytes > 0) sessionDetails.Add($"Memory {FormatBytes(session.WorkingSetBytes)}");
+        if (session.ThreadCount > 0) sessionDetails.Add($"{session.ThreadCount} threads");
+        if (session.StartedAt is DateTimeOffset startedAt) sessionDetails.Add($"Up {FormatSessionAge(DateTimeOffset.Now - startedAt)}");
+        SessionDetailText.Text = sessionDetails.Count > 0
+            ? string.Join(" \u00B7 ", sessionDetails)
+            : "Foreground process details unavailable";
+
         var downloads = _downloadMonitorService.Sample();
+        _activeDownloadCount = downloads.ActiveCount;
+        CompactDownloadText.Text = _activeDownloadCount.ToString();
+        FullDownloadText.Text = $"{_activeDownloadCount} active";
+        var showFullDownload = _activeDownloadCount > 0;
+        FullDownloadGroup.Visibility = showFullDownload ? Visibility.Visible : Visibility.Collapsed;
+        FullDownloadColumn.Width = showFullDownload ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        FullDownloadSeparatorColumn.Width = showFullDownload ? new GridLength(1) : new GridLength(0);
         UpdateDownloadColumnVisibility(downloads.HasActive);
         DownloadActivityProgressBar.Visibility = downloads.HasActive ? Visibility.Visible : Visibility.Collapsed;
 
@@ -523,6 +576,7 @@ public partial class MainWindow
         var focus = _focusTimerService.Snapshot();
         FocusTimerLabelText.Text = focus.Duration >= TimeSpan.FromMinutes(40) ? "Break" : "Focus";
         FocusTimerText.Text = focus.Display;
+        FullFocusText.Text = focus.Display;
         FocusPlayIconViewbox.Visibility = focus.IsRunning ? Visibility.Collapsed : Visibility.Visible;
         FocusPauseIconViewbox.Visibility = focus.IsRunning ? Visibility.Visible : Visibility.Collapsed;
 
@@ -538,6 +592,10 @@ public partial class MainWindow
             activity.Add($"DL {downloads.ActiveCount}");
         }
         var discordVoice = _discordVoiceService?.Current ?? DiscordVoiceSnapshot.Empty;
+        FullDiscordGroup.Visibility = discordVoice.IsConnected ? Visibility.Visible : Visibility.Collapsed;
+        FullDiscordColumn.Width = discordVoice.IsConnected ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        FullDiscordSeparatorColumn.Width = discordVoice.IsConnected ? new GridLength(1) : new GridLength(0);
+        FullDiscordText.Text = string.IsNullOrWhiteSpace(discordVoice.ChannelName) ? "Discord VC" : discordVoice.ChannelName;
         if (discordVoice.IsConnected)
         {
             activity.Add(string.IsNullOrWhiteSpace(discordVoice.ChannelName) ? "Discord VC" : $"VC {discordVoice.ChannelName}");
@@ -566,27 +624,31 @@ public partial class MainWindow
 
     private void UpdateDownloadColumnVisibility(bool hasActiveDownloads)
     {
-        DownloadColumn.MinWidth = hasActiveDownloads ? 200 : 0;
-        DownloadColumn.Width = hasActiveDownloads ? new GridLength(0.95, GridUnitType.Star) : new GridLength(0);
-        DownloadLeadingSeparatorColumn.Width = hasActiveDownloads ? new GridLength(1) : new GridLength(0);
-        var visibility = hasActiveDownloads ? Visibility.Visible : Visibility.Collapsed;
-        DownloadGroup.Visibility = visibility;
-        DownloadLeadingSeparator.Visibility = visibility;
+        DownloadColumn.MinWidth = hasActiveDownloads ? 300 : 230;
+        DownloadColumn.Width = new GridLength(hasActiveDownloads ? 0.95 : 0.72, GridUnitType.Star);
+        DownloadLeadingSeparatorColumn.Width = new GridLength(1);
+        DownloadLeadingSeparator.Visibility = Visibility.Visible;
+        DownloadGroup.Visibility = hasActiveDownloads ? Visibility.Visible : Visibility.Collapsed;
+        SessionGroup.Visibility = hasActiveDownloads ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void UpdateDiscordColumnVisibility(bool isConnected)
     {
-        DiscordVoiceColumn.MinWidth = isConnected ? 250 : 0;
-        DiscordVoiceColumn.Width = isConnected ? new GridLength(1.15, GridUnitType.Star) : new GridLength(0);
-        CommunicationSeparatorColumn.Width = isConnected ? new GridLength(1) : new GridLength(0);
         DiscordVoiceGroup.Visibility = isConnected ? Visibility.Visible : Visibility.Collapsed;
-        CommunicationSeparator.Visibility = isConnected ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static string FormatMediaTime(TimeSpan value)
     {
         if (value < TimeSpan.Zero) value = TimeSpan.Zero;
         return value.TotalHours >= 1 ? value.ToString(@"h\:mm\:ss") : value.ToString(@"m\:ss");
+    }
+
+    private static string FormatSessionAge(TimeSpan age)
+    {
+        if (age < TimeSpan.Zero) age = TimeSpan.Zero;
+        if (age.TotalDays >= 1) return $"{(int)age.TotalDays}d {age.Hours}h";
+        if (age.TotalHours >= 1) return $"{(int)age.TotalHours}h {age.Minutes}m";
+        return $"{Math.Max(0, (int)age.TotalMinutes)}m";
     }
 
     private static string FormatBytes(long bytes)

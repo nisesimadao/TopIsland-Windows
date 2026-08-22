@@ -63,9 +63,15 @@ public sealed class MediaSessionService
                     ? properties.AlbumTitle
                     : FriendlySource(session.SourceAppUserModelId);
 
-            var endMs = timeline.EndTime.TotalMilliseconds;
+            var duration = timeline.EndTime < TimeSpan.Zero ? TimeSpan.Zero : timeline.EndTime;
+            var position = timeline.Position < TimeSpan.Zero ? TimeSpan.Zero : timeline.Position;
+            if (duration > TimeSpan.Zero && position > duration)
+            {
+                position = duration;
+            }
+            var endMs = duration.TotalMilliseconds;
             var progress = endMs > 0
-                ? Math.Clamp(timeline.Position.TotalMilliseconds / endMs, 0, 1)
+                ? Math.Clamp(position.TotalMilliseconds / endMs, 0, 1)
                 : 0;
 
             var artworkKey = $"{session.SourceAppUserModelId}|{properties.Title}|{properties.Artist}|{properties.AlbumTitle}";
@@ -88,8 +94,8 @@ public sealed class MediaSessionService
                 FriendlySource(session.SourceAppUserModelId),
                 playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
                 progress,
-                timeline.Position,
-                timeline.EndTime,
+                position,
+                duration,
                 artwork);
         }
         catch
@@ -112,6 +118,26 @@ public sealed class MediaSessionService
             return session.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing
                 ? await session.TryPauseAsync()
                 : await session.TryPlayAsync();
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> SeekAsync(double progress)
+    {
+        try
+        {
+            var session = _activeSession;
+            if (session is null) return false;
+            var timeline = session.GetTimelineProperties();
+            var start = timeline.StartTime;
+            var end = timeline.EndTime;
+            var duration = end - start;
+            if (duration <= TimeSpan.Zero) return false;
+            var target = start + TimeSpan.FromTicks((long)(duration.Ticks * Math.Clamp(progress, 0, 1)));
+            return await session.TryChangePlaybackPositionAsync(target.Ticks);
         }
         catch
         {

@@ -28,6 +28,20 @@ public sealed class NotificationService
         catch { return false; }
     }
 
+    public bool ClearAll()
+    {
+        if (!IsAccessAllowed()) return false;
+        try
+        {
+            _listener.ClearNotifications();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public async Task<NotificationSnapshot> SampleAsync()
     {
         if (!IsAccessAllowed()) return new NotificationSnapshot(false, Array.Empty<NotificationItemSnapshot>());
