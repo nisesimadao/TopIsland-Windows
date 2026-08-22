@@ -214,4 +214,4 @@ The repository includes `TopIsland.PvRenderer`, a deterministic WPF renderer for
 dotnet run --project .\TopIsland.PvRenderer\TopIsland.PvRenderer.csproj -c Release -- .\docs\TopIsland-PV.mp4
 ```
 
-The current timeline is notch-only and demonstrates top-edge reveal, compact status, expansion, focused metric/system highlights, collapse, and the final hidden state.
+The current timeline is notch-only and uses Japanese product captions. Reveal, surface expansion, camera movement, highlight fades, and captions use separate easing profiles. Highlight rectangles and camera focus points are derived from the same layout metrics used to draw the corresponding UI, so focused callouts stay registered with their content while the camera moves.
