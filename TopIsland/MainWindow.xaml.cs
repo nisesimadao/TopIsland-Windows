@@ -141,6 +141,7 @@ public partial class MainWindow : Window
         _overlayBehavior.Attach();
 
         _currentMonitor = _monitorService.Resolve(_settings);
+        BlurHostService.SetRevealProgress(_hwnd, 1.0);
         _externalBlurAvailable = RequiresLiveBlur(_settings.Material) && _blurHostService.Start(_hwnd);
         ApplyBackdropMaterial();
         PositionOnCurrentMonitor();
@@ -163,6 +164,7 @@ public partial class MainWindow : Window
         _pointerTimer.Stop();
         _transitionGuardTimer.Stop();
         StopWindowTransition();
+        BlurHostService.ClearRevealProgress(_hwnd);
         _blurHostService.Dispose();
         _statsService.Dispose();
         _hardwareTelemetryService?.Dispose();

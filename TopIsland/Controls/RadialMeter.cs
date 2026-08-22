@@ -169,16 +169,19 @@ public sealed class RadialMeter : FrameworkElement
 
         // Both rows begin inside the open gauge, close enough to the left arc to
         // read as a single symbol but far enough away to never touch it/ticks.
-        const double textLeft = 13.7;
+        // Bias the type slightly toward the lower-left pocket of the open arc.
+        // This keeps it visually tucked into the gauge instead of floating near
+        // the centre, while the smaller type leaves more air around the ticks.
+        const double textLeft = 11.95;
         var labelText = new FormattedText(Label, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
             new Typeface(new FontFamily("Segoe UI Variable"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
-            7.0, SecondaryTextBrush, dpi);
-        dc.DrawText(labelText, new Point(textLeft, 6.0));
+            6.10, SecondaryTextBrush, dpi);
+        dc.DrawText(labelText, new Point(textLeft, 8.0));
 
         var valueText = new FormattedText($"{value:0}%", CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
             new Typeface(new FontFamily("Segoe UI Variable"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
-            8.7, TextBrush, dpi);
-        dc.DrawText(valueText, new Point(textLeft - 0.15, 15.15));
+            8.45, TextBrush, dpi);
+        dc.DrawText(valueText, new Point(12.62, 15.65));
     }
 
     private void DrawValue(DrawingContext dc, double dpi, Point center, double fontSize, double value)

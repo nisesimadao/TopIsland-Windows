@@ -460,6 +460,13 @@ public partial class MainWindow
         var surfaceOpacity = Lerp(_windowFromSurfaceOpacity, _windowToSurfaceOpacity, amount);
         SurfacePath.Opacity = surfaceOpacity;
         ContentHost.Opacity = surfaceOpacity;
+        // Acrylic/Glass live in a companion layered HWND. Keep that backdrop on
+        // the exact same reveal timeline as the WPF shell so a hidden surface can
+        // never leave a floating rectangle of blur behind.
+        var blurRevealProgress = _settings.Style == IslandStyle.Notch
+            ? _edgeRevealProgress
+            : surfaceOpacity;
+        BlurHostService.SetRevealProgress(_hwnd, blurRevealProgress);
         var isCleanExpand = _windowFromCompactOpacity > 0.98
                             && _windowToCompactOpacity < 0.02
                             && _windowFromExpandedOpacity < 0.02

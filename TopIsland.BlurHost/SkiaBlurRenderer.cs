@@ -48,6 +48,7 @@ internal sealed class SkiaBlurRenderer : IDisposable
     private int _cachedStyle = int.MinValue;
     private bool _cachedExpanded;
     private double _cachedScale = -1;
+    private double _cachedRevealProgress = -1;
     private BlurFrameOptions _cachedOptions;
 
     public SkiaBlurRenderer(IntPtr hostHwnd)
@@ -63,6 +64,7 @@ internal sealed class SkiaBlurRenderer : IDisposable
         double scale,
         int style,
         bool expanded,
+        double revealProgress,
         BlurFrameOptions options)
     {
         if (_disposed || width <= 0 || height <= 0)
@@ -87,7 +89,7 @@ internal sealed class SkiaBlurRenderer : IDisposable
                 return false;
             }
 
-            EnsureSkiaResources(width, height, scale, style, expanded, options);
+            EnsureSkiaResources(width, height, scale, style, expanded, revealProgress, options);
             if (_sourceSkia is null || _outputCanvas is null || _blurSkia is null ||
                 _blurCanvas is null || _shapePath is null || _blurPaint is null || _tintPaint is null)
             {
@@ -123,7 +125,9 @@ internal sealed class SkiaBlurRenderer : IDisposable
             {
                 BlendOp = AcSrcOver,
                 BlendFlags = 0,
-                SourceConstantAlpha = 255,
+                SourceConstantAlpha = style == 1
+                    ? (byte)255
+                    : (byte)Math.Round(255 * Math.Clamp(revealProgress, 0, 1)),
                 AlphaFormat = AcSrcAlpha
             };
 
@@ -150,6 +154,7 @@ internal sealed class SkiaBlurRenderer : IDisposable
         double scale,
         int style,
         bool expanded,
+        double revealProgress,
         BlurFrameOptions options)
     {
         if (_sourceSkia is null || _outputSkia is null || _blurSkia is null || _outputCanvas is null || _blurCanvas is null)
@@ -171,13 +176,15 @@ internal sealed class SkiaBlurRenderer : IDisposable
             _blurCanvas = new SKCanvas(_blurSkia);
         }
 
-        if (_shapePath is null || _cachedStyle != style || _cachedExpanded != expanded || Math.Abs(_cachedScale - scale) > 0.001)
+        var revealChangesShape = style == 1 && Math.Abs(_cachedRevealProgress - revealProgress) > 0.001;
+        if (_shapePath is null || _cachedStyle != style || _cachedExpanded != expanded || Math.Abs(_cachedScale - scale) > 0.001 || revealChangesShape)
         {
             _shapePath?.Dispose();
-            _shapePath = CreateShapePath(width, height, scale, style, expanded);
+            _shapePath = CreateShapePath(width, height, scale, style, expanded, revealProgress);
             _cachedStyle = style;
             _cachedExpanded = expanded;
             _cachedScale = scale;
+            _cachedRevealProgress = revealProgress;
         }
 
         if (_blurPaint is null || !_cachedOptions.Equals(options))
@@ -198,7 +205,7 @@ internal sealed class SkiaBlurRenderer : IDisposable
         _tintPaint.Color = new SKColor(options.TintR, options.TintG, options.TintB, options.TintAlpha);
     }
 
-    private static SKPath CreateShapePath(int width, int height, double scale, int style, bool expanded)
+    private static SKPath CreateShapePath(int width, int height, double scale, int style, bool expanded, double revealProgress)
     {
         using var builder = new SKPathBuilder();
         var pad = (float)(16 * scale);
@@ -219,12 +226,22 @@ internal sealed class SkiaBlurRenderer : IDisposable
             return builder.Detach();
         }
 
+        revealProgress = Math.Clamp(revealProgress, 0, 1);
+        if (revealProgress <= 0.001)
+        {
+            return builder.Detach();
+        }
+
         var notchLeft = pad;
         var notchRight = Math.Max(notchLeft + 1, width - pad);
         var notchTop = 0f;
-        var notchBottom = Math.Max(1f, height - pad);
-        var topRadius = (float)((expanded ? 19.0 : 6.0) * scale);
-        var bottomRadius = (float)((expanded ? 24.0 : 14.0) * scale);
+        var fullNotchBottom = Math.Max(1f, height - pad);
+        var notchBottom = Math.Max(0.01f, (float)(fullNotchBottom * revealProgress));
+        var shoulderScale = Math.Pow(revealProgress, 1.18);
+        var topRadius = (float)((expanded ? 19.0 : 6.0) * scale * shoulderScale);
+        var bottomRadius = (float)((expanded ? 24.0 : 14.0) * scale * shoulderScale);
+        topRadius = Math.Min(topRadius, notchBottom / 2f);
+        bottomRadius = Math.Min(bottomRadius, notchBottom / 2f);
         bottomRadius = Math.Min(bottomRadius, Math.Max(1f, (notchRight - notchLeft) / 4f));
 
         builder.MoveTo(notchLeft, notchTop);
@@ -347,6 +364,7 @@ internal sealed class SkiaBlurRenderer : IDisposable
         _cachedStyle = int.MinValue;
         _cachedExpanded = false;
         _cachedScale = -1;
+        _cachedRevealProgress = -1;
         _cachedOptions = default;
     }
 

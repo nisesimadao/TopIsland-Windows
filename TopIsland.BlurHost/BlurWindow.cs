@@ -22,6 +22,7 @@ internal sealed class BlurWindow : IDisposable
     private const int WmTimer = 0x0113;
     private const int WmNcHitTest = 0x0084;
     private const int HtTransparent = -1;
+    private const string RevealProgressProperty = "TopIsland.BlurRevealProgress";
 
     private static readonly string WindowClass = $"TopIsland.BlurHost.{Environment.ProcessId}";
     private static readonly WndProcDelegate WndProcThunk = WndProc;
@@ -99,7 +100,10 @@ internal sealed class BlurWindow : IDisposable
         }
 
         ReadSettingsIfNeeded(force);
-        var shouldShow = IsWindowVisible(_target) && _settings.Material is 2 or 3;
+        var revealProgress = ReadRevealProgress();
+        var shouldShow = IsWindowVisible(_target)
+                         && _settings.Material is 2 or 3
+                         && revealProgress > 0.001;
         if (!shouldShow || !GetWindowRect(_target, out var rect))
         {
             Hide();
@@ -140,6 +144,7 @@ internal sealed class BlurWindow : IDisposable
                 scale,
                 _settings.Style,
                 expanded,
+                revealProgress,
                 options))
             {
                 _lastFrameTick = now;
@@ -152,6 +157,20 @@ internal sealed class BlurWindow : IDisposable
                 _visible = true;
             }
         }
+    }
+
+
+    private double ReadRevealProgress()
+    {
+        var value = GetProp(_target, RevealProgressProperty).ToInt64();
+        if (value <= 0)
+        {
+            // Backwards-compatible default if the main app has not published the
+            // property yet (for example during a mixed-version development run).
+            return 1.0;
+        }
+
+        return Math.Clamp((value - 1) / 1000.0, 0, 1);
     }
 
     private static bool RectsEqual(NativeRect left, NativeRect right) =>
@@ -361,6 +380,8 @@ internal sealed class BlurWindow : IDisposable
     private static extern bool IsWindow(IntPtr hwnd);
     [DllImport("user32.dll")]
     private static extern bool IsWindowVisible(IntPtr hwnd);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr GetProp(IntPtr hwnd, string name);
     [DllImport("user32.dll")]
     private static extern UIntPtr SetTimer(IntPtr hwnd, UIntPtr id, uint elapse, IntPtr timerFunc);
     [DllImport("user32.dll")]
