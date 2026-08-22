@@ -30,6 +30,8 @@ public partial class MainWindow : Window
     private NotificationService? _notificationService;
     private DiscordVoiceService? _discordVoiceService;
     private HardwareTelemetryService? _hardwareTelemetryService;
+    private AudioStatusService? _audioStatusService;
+    private AudioStatusSnapshot _lastAudioStatus = AudioStatusSnapshot.Unavailable;
     private readonly BlurHostService _blurHostService = new();
     private readonly MonitorService _monitorService;
     private readonly DispatcherTimer _statsTimer = new() { Interval = TimeSpan.FromSeconds(1) };
@@ -143,6 +145,9 @@ public partial class MainWindow : Window
         _statsService.Dispose();
         _hardwareTelemetryService?.Dispose();
         _hardwareTelemetryService = null;
+        _audioStatusService?.Dispose();
+        _audioStatusService = null;
+        _lastAudioStatus = AudioStatusSnapshot.Unavailable;
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)

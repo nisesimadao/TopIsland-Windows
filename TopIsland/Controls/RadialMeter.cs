@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 
 namespace TopIsland.Controls;
 
@@ -8,6 +9,10 @@ public sealed class RadialMeter : FrameworkElement
 {
     public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(
         nameof(Value), typeof(double), typeof(RadialMeter),
+        new FrameworkPropertyMetadata(0d, FrameworkPropertyMetadataOptions.AffectsRender, OnValueChanged));
+
+    private static readonly DependencyProperty AnimatedValueProperty = DependencyProperty.Register(
+        nameof(AnimatedValue), typeof(double), typeof(RadialMeter),
         new FrameworkPropertyMetadata(0d, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty LabelProperty = DependencyProperty.Register(
@@ -47,6 +52,8 @@ public sealed class RadialMeter : FrameworkElement
     public bool ShowLabel { get => (bool)GetValue(ShowLabelProperty); set => SetValue(ShowLabelProperty, value); }
     public bool IsTachometer { get => (bool)GetValue(IsTachometerProperty); set => SetValue(IsTachometerProperty, value); }
 
+    private double AnimatedValue { get => (double)GetValue(AnimatedValueProperty); set => SetValue(AnimatedValueProperty, value); }
+
     protected override Size MeasureOverride(Size availableSize) => IsTachometer ? new(40, 40) : new(46, 52);
 
     protected override void OnRender(DrawingContext dc)
@@ -61,6 +68,34 @@ public sealed class RadialMeter : FrameworkElement
         DrawRadialMeter(dc);
     }
 
+    private static void OnValueChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
+    {
+        var meter = (RadialMeter)dependencyObject;
+        var target = Math.Clamp((double)args.NewValue, 0, 100);
+        var from = Math.Clamp(meter.AnimatedValue, 0, 100);
+
+        meter.BeginAnimation(AnimatedValueProperty, null);
+        meter.AnimatedValue = from;
+
+        if (!meter.IsLoaded || Math.Abs(target - from) < 0.15)
+        {
+            meter.AnimatedValue = target;
+            return;
+        }
+
+        var animation = new DoubleAnimation(from, target, TimeSpan.FromMilliseconds(meter.IsTachometer ? 260 : 220))
+        {
+            EasingFunction = new PowerEase { Power = 2.15, EasingMode = EasingMode.EaseOut },
+            FillBehavior = FillBehavior.Stop
+        };
+        animation.Completed += (_, _) =>
+        {
+            meter.BeginAnimation(AnimatedValueProperty, null);
+            meter.AnimatedValue = target;
+        };
+        meter.BeginAnimation(AnimatedValueProperty, animation, HandoffBehavior.SnapshotAndReplace);
+    }
+
     private void DrawRadialMeter(DrawingContext dc)
     {
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
@@ -71,13 +106,13 @@ public sealed class RadialMeter : FrameworkElement
         var progressPen = CreatePen(ProgressBrush, 3.2);
         dc.DrawEllipse(null, trackPen, center, radius, radius);
 
-        var value = Math.Clamp(Value, 0, 100);
+        var value = Math.Clamp(AnimatedValue, 0, 100);
         if (value > 0.2)
         {
             dc.DrawGeometry(null, progressPen, CreateArc(center, radius, -90, 360 * value / 100));
         }
 
-        DrawValue(dc, dpi, center, 10, includePercentSign: true);
+        DrawValue(dc, dpi, center, 10, value);
 
         if (ShowLabel)
         {
@@ -90,10 +125,9 @@ public sealed class RadialMeter : FrameworkElement
     private void DrawTachometer(DrawingContext dc)
     {
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        // Compact meters are intentionally raised and clipped by their parent.
-        // A 270-degree sweep reads like an automotive tachometer instead of a
-        // circular progress ring: low usage begins at the lower-left and climbs
-        // clockwise over the top before reaching the lower-right.
+        // The compact meter deliberately behaves like a gauge rather than a pie
+        // chart: it starts at the lower-left, climbs clockwise over the top, and
+        // finishes at the lower-right. The parent clips its raised top edge.
         const double startAngle = 135;
         const double sweepAngle = 270;
         var radius = Math.Max(7, Math.Min(ActualWidth, ActualHeight) / 2 - 3.0);
@@ -112,20 +146,18 @@ public sealed class RadialMeter : FrameworkElement
             dc.DrawLine(tickPen, inner, outer);
         }
 
-        var value = Math.Clamp(Value, 0, 100);
+        var value = Math.Clamp(AnimatedValue, 0, 100);
         if (value > 0.2)
         {
             dc.DrawGeometry(null, progressPen, CreateArc(center, radius, startAngle, sweepAngle * value / 100));
         }
 
-        DrawValue(dc, dpi, new Point(center.X + 1.0, center.Y + 2.2), 9.2, includePercentSign: true);
+        DrawValue(dc, dpi, new Point(center.X + 1.0, center.Y + 2.2), 9.2, value);
     }
 
-    private void DrawValue(DrawingContext dc, double dpi, Point center, double fontSize, bool includePercentSign)
+    private void DrawValue(DrawingContext dc, double dpi, Point center, double fontSize, double value)
     {
-        var value = Math.Clamp(Value, 0, 100);
-        var text = includePercentSign ? $"{value:0}%" : $"{value:0}";
-        var valueText = new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+        var valueText = new FormattedText($"{value:0}%", CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
             new Typeface(new FontFamily("Segoe UI Variable"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal), fontSize, TextBrush, dpi);
         dc.DrawText(valueText, new Point(center.X - valueText.Width / 2, center.Y - valueText.Height / 2));
     }

@@ -306,6 +306,17 @@
                                 <Button x:Name="DiscordDisconnectButton" Style="{StaticResource IconButtonStyle}" Width="27" Height="27" Click="DiscordDisconnectButton_Click" ToolTip="Leave Discord voice" AutomationProperties.Name="Leave Discord voice"><Viewbox Width="12" Height="12"><Path Data="{StaticResource HangupGeometry}" Fill="#FFE15B64"/></Viewbox></Button>
                             </StackPanel>
                         </Grid>
+                        <Grid x:Name="OverviewAudioGroup" Grid.Row="2" Margin="0,5,0,0" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" MinWidth="0">
+                                <TextBlock Text="OUTPUT" FontSize="7.5" Foreground="{DynamicResource TertiaryTextBrush}"/>
+                                <TextBlock x:Name="OverviewAudioDeviceText" Text="Default audio" FontSize="9.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="185"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="8,0,0,0">
+                                <TextBlock Text="VOLUME" FontSize="7.5" Foreground="{DynamicResource TertiaryTextBrush}" HorizontalAlignment="Right"/>
+                                <TextBlock x:Name="OverviewAudioVolumeText" Text="--" FontSize="9.5" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" HorizontalAlignment="Right"/>
+                            </StackPanel>
+                        </Grid>
                     </Grid>
 
                     <Border x:Name="NotificationSeparator" Grid.Column="3" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,2" Visibility="Collapsed"/>

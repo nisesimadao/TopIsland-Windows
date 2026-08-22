@@ -547,9 +547,8 @@ public partial class MainWindow
             var thermal = new List<string>();
             if (hardware.CpuTemperatureC is double cpuTemp) thermal.Add($"CPU {cpuTemp:0}\u00B0C");
             if (hardware.GpuTemperatureC is double gpuTemp) thermal.Add($"GPU {gpuTemp:0}\u00B0C");
-            HardwareDetailText.Text = thermal.Count > 0
-                ? string.Join(" \u00B7 ", thermal)
-                : "Temperature unavailable";
+            thermal.Add($"Up {FormatSessionAge(TimeSpan.FromMilliseconds(Environment.TickCount64))}");
+            HardwareDetailText.Text = string.Join(" \u00B7 ", thermal);
 
             OverviewPowerText.Text = hardware.PowerMode;
             if (stats.HasBattery)
@@ -568,11 +567,25 @@ public partial class MainWindow
                         ? $"CPU {overviewCpuTemp:0}\u00B0C"
                         : "Unavailable";
             }
+
+            _audioStatusService ??= new AudioStatusService();
+            _lastAudioStatus = _audioStatusService.Sample();
+            UpdateOverviewAuxiliaryVisibility(_discordVoiceService?.Current.IsConnected == true);
         }
-        else if (_hardwareTelemetryService is not null)
+        else
         {
-            _hardwareTelemetryService.Dispose();
-            _hardwareTelemetryService = null;
+            if (_hardwareTelemetryService is not null)
+            {
+                _hardwareTelemetryService.Dispose();
+                _hardwareTelemetryService = null;
+            }
+            if (_audioStatusService is not null)
+            {
+                _audioStatusService.Dispose();
+                _audioStatusService = null;
+            }
+            _lastAudioStatus = AudioStatusSnapshot.Unavailable;
+            OverviewAudioGroup.Visibility = Visibility.Collapsed;
         }
 
         if (stats.StorageTotalBytes > 0)
@@ -716,6 +729,22 @@ public partial class MainWindow
     private void UpdateDiscordColumnVisibility(bool isConnected)
     {
         DiscordVoiceGroup.Visibility = isConnected ? Visibility.Visible : Visibility.Collapsed;
+        UpdateOverviewAuxiliaryVisibility(isConnected);
+    }
+
+    private void UpdateOverviewAuxiliaryVisibility(bool discordConnected)
+    {
+        var showAudio = _state == SurfaceState.Expanded && !discordConnected && _lastAudioStatus.Available;
+        OverviewAudioGroup.Visibility = showAudio ? Visibility.Visible : Visibility.Collapsed;
+        if (!showAudio)
+        {
+            return;
+        }
+
+        OverviewAudioDeviceText.Text = _lastAudioStatus.DeviceName;
+        OverviewAudioVolumeText.Text = _lastAudioStatus.Muted
+            ? "Muted"
+            : $"{_lastAudioStatus.VolumePercent:0}%";
     }
 
     private static string FormatMediaTime(TimeSpan value)
