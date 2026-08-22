@@ -198,6 +198,32 @@ public sealed class LayoutAndGeometryTests
     }
 
     [Fact]
+    public void DiscordConnectionEvidenceIgnoresOtherActiveVoiceChannelsAndGlobalControls()
+    {
+        string[] disconnectedTree =
+        [
+            "Lobby (ボイスチャンネル), Alice, Bob, 通話時間8分",
+            "Mute",
+            "Deafen",
+            "VOICE"
+        ];
+
+        Assert.False(DiscordVoiceService.HasActiveConnectionEvidence(disconnectedTree));
+        Assert.True(DiscordVoiceService.HasActiveConnectionEvidence(["Mute", "Disconnect", "Deafen"]));
+        Assert.True(DiscordVoiceService.HasActiveConnectionEvidence(["ミュート", "切断", "スピーカーミュート"]));
+    }
+
+    [Fact]
+    public async Task DiscordVoiceActionsAreNoOpsWhileDisconnected()
+    {
+        var service = new DiscordVoiceService();
+
+        Assert.False(await service.ToggleMuteAsync());
+        Assert.False(await service.ToggleDeafenAsync());
+        Assert.False(await service.DisconnectAsync());
+    }
+
+    [Fact]
     public void DownloadActivityGraceRejectsStalePartialFiles()
     {
         var now = new DateTime(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc);

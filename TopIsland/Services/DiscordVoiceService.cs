@@ -80,6 +80,12 @@ public sealed class DiscordVoiceService
 
     public async Task<bool> ToggleMuteAsync()
     {
+        var current = Current;
+        if (!current.IsConnected || !current.CanToggleMute)
+        {
+            return false;
+        }
+
         var result = await Task.Run(() => TryToggleControl(MuteNames));
         if (result)
         {
@@ -93,6 +99,12 @@ public sealed class DiscordVoiceService
 
     public async Task<bool> ToggleDeafenAsync()
     {
+        var current = Current;
+        if (!current.IsConnected || !current.CanToggleDeafen)
+        {
+            return false;
+        }
+
         var result = await Task.Run(() => TryToggleControl(DeafenNames));
         if (result)
         {
@@ -104,6 +116,12 @@ public sealed class DiscordVoiceService
 
     public async Task<bool> DisconnectAsync()
     {
+        var current = Current;
+        if (!current.IsConnected || !current.CanDisconnect)
+        {
+            return false;
+        }
+
         var result = await Task.Run(() => TryInvokeControl(DisconnectNames));
         if (result)
         {
@@ -133,7 +151,7 @@ public sealed class DiscordVoiceService
         }
 
         var elements = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
-        var connected = false;
+        var hasConnectionEvidence = false;
         var muted = false;
         var deafened = false;
         var canMute = false;
@@ -163,7 +181,7 @@ public sealed class DiscordVoiceService
 
             if (IsDisconnectName(name))
             {
-                connected = true;
+                hasConnectionEvidence = true;
                 try
                 {
                     _ = element.GetCurrentPattern(InvokePattern.Pattern);
@@ -172,13 +190,6 @@ public sealed class DiscordVoiceService
                 catch
                 {
                 }
-            }
-
-            if (name.Contains("\u901A\u8A71\u4E2D", StringComparison.Ordinal)
-                || name.Contains("Connected", StringComparison.OrdinalIgnoreCase)
-                || name.Contains("In call", StringComparison.OrdinalIgnoreCase))
-            {
-                connected = true;
             }
 
             if (MuteNames.Any(candidate => name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
@@ -210,7 +221,10 @@ public sealed class DiscordVoiceService
             if (activeVoiceChannel.Length == 0
                 && DiscordVoiceParser.TryParseActiveVoiceElement(name, out var voiceChannel, out var voiceParticipants, out var extraParticipants))
             {
-                connected = true;
+                // Voice-channel rows describe everyone currently in that channel,
+                // even when this user is not connected. They are useful metadata
+                // only after a user-specific disconnect control proves the local
+                // client is actually in voice.
                 activeVoiceChannel = voiceChannel;
                 extraParticipantCount = extraParticipants;
                 foreach (var voiceParticipant in voiceParticipants)
@@ -226,6 +240,7 @@ public sealed class DiscordVoiceService
             }
         }
 
+        var connected = hasConnectionEvidence;
         var (channel, server) = DiscordVoiceParser.ParseWindowTitle(target.Title);
         if (!string.IsNullOrWhiteSpace(activeVoiceChannel))
         {
@@ -234,7 +249,9 @@ public sealed class DiscordVoiceService
 
         if (!connected)
         {
-            return new DiscordVoiceSnapshot(true, false, string.Empty, server, 0, string.Empty, muted, deafened, canMute, canDeafen, canDisconnect);
+            // Mute/deafen controls exist globally in Discord even outside a VC.
+            // Never expose them as actionable voice controls while disconnected.
+            return new DiscordVoiceSnapshot(true, false, string.Empty, server, 0, string.Empty, false, false, false, false, false);
         }
 
         var participantList = participants.Take(3).ToArray();
@@ -260,46 +277,46 @@ public sealed class DiscordVoiceService
 
     private static bool TryToggleControl(IEnumerable<string> names)
     {
-        var target = FindDiscordWindow();
-        if (target.Handle == IntPtr.Zero)
+        try
         {
-            return false;
+            if (!TryGetLiveConnectedElements(out var elements))
+            {
+                return false;
+            }
+
+            for (var i = 0; i < elements.Count; i++)
+            {
+                var element = elements[i];
+                string name;
+                try
+                {
+                    name = element.Current.Name ?? string.Empty;
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (!names.Any(candidate => name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var pattern = (TogglePattern)element.GetCurrentPattern(TogglePattern.Pattern);
+                    pattern.Toggle();
+                    return true;
+                }
+                catch
+                {
+                }
+            }
         }
-
-        var root = AutomationElement.FromHandle(target.Handle);
-        if (root is null)
+        catch
         {
-            return false;
-        }
-
-        var elements = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
-        for (var i = 0; i < elements.Count; i++)
-        {
-            var element = elements[i];
-            string name;
-            try
-            {
-                name = element.Current.Name ?? string.Empty;
-            }
-            catch
-            {
-                continue;
-            }
-
-            if (!names.Any(candidate => name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
-            {
-                continue;
-            }
-
-            try
-            {
-                var pattern = (TogglePattern)element.GetCurrentPattern(TogglePattern.Pattern);
-                pattern.Toggle();
-                return true;
-            }
-            catch
-            {
-            }
+            // UI Automation can invalidate the Discord tree between frames.
+            // A voice action should fail closed, never tear down TopIsland.
         }
 
         return false;
@@ -307,6 +324,54 @@ public sealed class DiscordVoiceService
 
     private static bool TryInvokeControl(IEnumerable<string> names)
     {
+        try
+        {
+            if (!TryGetLiveConnectedElements(out var elements))
+            {
+                return false;
+            }
+
+            for (var i = 0; i < elements.Count; i++)
+            {
+                var element = elements[i];
+                string name;
+                try
+                {
+                    name = element.Current.Name ?? string.Empty;
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (!names.Any(candidate => name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var pattern = (InvokePattern)element.GetCurrentPattern(InvokePattern.Pattern);
+                    pattern.Invoke();
+                    return true;
+                }
+                catch
+                {
+                }
+            }
+        }
+        catch
+        {
+            // Discord may rebuild its accessibility tree while the button is
+            // being pressed. Treat that as a no-op instead of an app crash.
+        }
+
+        return false;
+    }
+
+    private static bool TryGetLiveConnectedElements(out AutomationElementCollection elements)
+    {
+        elements = null!;
         var target = FindDiscordWindow();
         if (target.Handle == IntPtr.Zero)
         {
@@ -319,33 +384,22 @@ public sealed class DiscordVoiceService
             return false;
         }
 
-        var elements = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+        elements = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
         for (var i = 0; i < elements.Count; i++)
         {
-            var element = elements[i];
             string name;
             try
             {
-                name = element.Current.Name ?? string.Empty;
+                name = elements[i].Current.Name ?? string.Empty;
             }
             catch
             {
                 continue;
             }
 
-            if (!names.Any(candidate => name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+            if (IsDisconnectName(name))
             {
-                continue;
-            }
-
-            try
-            {
-                var pattern = (InvokePattern)element.GetCurrentPattern(InvokePattern.Pattern);
-                pattern.Invoke();
                 return true;
-            }
-            catch
-            {
             }
         }
 
@@ -420,6 +474,9 @@ public sealed class DiscordVoiceService
         var buffer = new StringBuilder(length);
         return GetWindowText(hwnd, buffer, buffer.Capacity) > 0 ? buffer.ToString() : string.Empty;
     }
+
+    internal static bool HasActiveConnectionEvidence(IEnumerable<string> names) =>
+        names.Any(IsDisconnectName);
 
     private static bool IsDisconnectName(string name) =>
         DisconnectNames.Any(candidate => name.Equals(candidate, StringComparison.OrdinalIgnoreCase));
