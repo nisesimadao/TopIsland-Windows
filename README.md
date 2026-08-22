@@ -36,8 +36,8 @@ TopIsland currently uses real Windows/application data for:
 - Network download/upload throughput
 - System-drive free/total storage
 - Active browser/download-manager partial downloads, including current bytes and measured transfer speed when available
-- Built-in **Focus timer** with 25/45-minute presets, pause/resume and reset
-- Windows notifications: count, source app and latest text when notification-listener access is allowed, plus a real Clear all action
+- Built-in **Focus timer** with 25/45-minute presets, pause/resume, reset and an Expanded progress indicator while active
+- Windows notifications: count, source app, app logo when Windows exposes it (initial badge fallback), latest text when notification-listener access is allowed, plus a real Clear all action
 - Battery level/charging state on devices that actually have a battery
 - Clock and date
 
@@ -51,7 +51,7 @@ Notification permission is never requested automatically. If access is not alrea
 - **Peek** — reveals selected lower-priority information without opening the full surface
 - **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM and Discord voice controls, and Notifications when present. The lower row is Timers, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware
 
-Smaller widths remove information instead of shrinking every label. When no download is moving, the lower middle lane shows the foreground **SESSION** (process, memory, CPU, threads and uptime); an active download replaces that lane instead of creating another permanent card. Downloads still exists only while a partial download is actively changing: otherwise the same middle lane becomes SESSION with foreground-process CPU, memory and uptime. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. Its right-edge settings gear opens the same real TopIsland context menu used by the tray/overlay. The Expanded clock remains the visual anchor above the two-row information layout.
+Smaller widths remove information instead of shrinking every label. When no download is moving, the lower middle lane shows the foreground **SESSION** (process, memory, CPU, threads and uptime); an actively changing partial download replaces that lane instead of creating another permanent card. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. Its right-edge settings gear opens the same real TopIsland context menu used by the tray/overlay. The Expanded clock remains the visual anchor above the two-row information layout.
 
 ## Screenshots
 
