@@ -79,6 +79,12 @@ public partial class MainWindow : Window
     private long _visualTransitionSerial;
     private bool _pointerWasInside;
     private bool _edgeRevealVisualHidden;
+    private double _edgeRevealProgress = 1.0;
+    private bool _edgeRevealTransitionActive;
+    private DateTime _edgeRevealTransitionStartedAt;
+    private int _edgeRevealTransitionDurationMs;
+    private double _edgeRevealFromProgress = 1.0;
+    private double _edgeRevealToProgress = 1.0;
 
     public event EventHandler? SettingsChanged;
 
@@ -142,6 +148,7 @@ public partial class MainWindow : Window
         _collapseTimer.Stop();
         _pointerTimer.Stop();
         _transitionGuardTimer.Stop();
+        StopEdgeRevealTransition();
         _blurHostService.Dispose();
         _statsService.Dispose();
         _hardwareTelemetryService?.Dispose();

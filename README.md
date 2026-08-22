@@ -31,7 +31,7 @@ TopIsland currently uses real Windows/application data for:
 - Windows GMTC media title, source, artwork, playback position, interactive seek and Previous / Play-Pause / Next
 - Foreground application title, process and executable icon; Expanded also shows live foreground-process CPU, memory and process uptime in the SESSION lane when no download is active
 - **CPU / GPU / RAM** usage
-- Compact CPU/RAM use a clipped **270-degree tachometer sweep**: usage climbs clockwise from the lower-left across the top, with short ease-out interpolation so live samples move like gauges instead of jumping between values
+- Compact CPU/RAM use a tiny **open-right tachometer gauge** that stays inside the existing 43×34 footprint. The upper/left arc wraps the two text rows, so `CPU` / `RAM` and the percentage read as part of the gauge rather than as a separate text column; live samples use short ease-out interpolation instead of jumping between values
 - **Discord VC** from the live Discord Desktop accessibility tree, including hidden/tray-minimized Electron windows, channel/server, participant count, Mute/Deafen state and real Mute / Deafen / Leave controls when Discord exposes those UIA patterns
 - Default Windows audio output and master volume in Expanded when Discord voice is not occupying that Overview slot
 - Network download/upload throughput
@@ -48,7 +48,7 @@ Notification permission is never requested automatically. If access is not alrea
 
 - **Idle** — media/app context, clock, open-right tachometer-style usage gauges labeled **CPU / RAM**, plus compact activity indicators when the selected width allows them
 - **Hover** — subtly wider/deeper
-- **Reveal on top edge** — optional mode that fades the idle surface completely away, keeps the hidden region click-through, and softly reveals it when the pointer reaches the top-center edge
+- **Reveal on top edge** — optional mode that hides the idle surface and keeps the hidden region click-through. For Notch, reaching the top-center edge grows the surface downward from the physical screen boundary: the inverse-R shoulders stay anchored at the top edge and increase their radius as the body emerges, rather than fading in
 - Hover gives a running Focus timer its own remaining-time + real Pause/Resume control before lower-priority activity text
 - **Peek** — reveals selected lower-priority information without opening the full surface
 - **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM, Power/Thermal and Discord voice controls (or Output/Volume when not in voice), plus Notifications when present. The lower row is Timers, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware/Uptime

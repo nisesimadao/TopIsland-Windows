@@ -248,18 +248,96 @@ public partial class MainWindow
         _edgeRevealVisualHidden = hidden;
         Root.IsHitTestVisible = !hidden;
 
-        var targetOpacity = hidden ? 0.0 : 1.0;
-        if (immediate)
+        if (_settings.Style != IslandStyle.Notch)
         {
-            SurfacePath.BeginAnimation(OpacityProperty, null);
-            ContentHost.BeginAnimation(OpacityProperty, null);
-            SurfacePath.Opacity = targetOpacity;
-            ContentHost.Opacity = targetOpacity;
+            // Dynamic Island remains a floating surface, so retain its opacity
+            // treatment. The screen-edge growth animation below is specifically
+            // designed around the notch's inverse-R shoulders at y=0.
+            StopEdgeRevealTransition();
+            _edgeRevealProgress = 1.0;
+            var targetOpacity = hidden ? 0.0 : 1.0;
+            if (immediate)
+            {
+                SurfacePath.BeginAnimation(OpacityProperty, null);
+                ContentHost.BeginAnimation(OpacityProperty, null);
+                SurfacePath.Opacity = targetOpacity;
+                ContentHost.Opacity = targetOpacity;
+                UpdateGeometry();
+                return;
+            }
+
+            AnimateOpacity(SurfacePath, targetOpacity, hidden ? 110 : 145, 0);
+            AnimateOpacity(ContentHost, targetOpacity, hidden ? 85 : 135, hidden ? 0 : 12);
             return;
         }
 
-        AnimateOpacity(SurfacePath, targetOpacity, hidden ? 110 : 145, 0);
-        AnimateOpacity(ContentHost, targetOpacity, hidden ? 85 : 135, hidden ? 0 : 12);
+        // A notch must not fade in from nowhere. Keep the surface fully opaque
+        // and animate the geometry itself from the physical top edge downward.
+        // ContentHost shares the same clip, so its contents are revealed by the
+        // growing shell rather than by an unrelated opacity animation.
+        SurfacePath.BeginAnimation(OpacityProperty, null);
+        ContentHost.BeginAnimation(OpacityProperty, null);
+        SurfacePath.Opacity = 1.0;
+        ContentHost.Opacity = 1.0;
+        StartEdgeRevealTransition(hidden ? 0.0 : 1.0, immediate);
+    }
+
+    private void StartEdgeRevealTransition(double targetProgress, bool immediate)
+    {
+        targetProgress = Math.Clamp(targetProgress, 0, 1);
+        StopEdgeRevealTransition();
+
+        if (immediate || Math.Abs(targetProgress - _edgeRevealProgress) < 0.001)
+        {
+            _edgeRevealProgress = targetProgress;
+            UpdateGeometry();
+            return;
+        }
+
+        _edgeRevealFromProgress = _edgeRevealProgress;
+        _edgeRevealToProgress = targetProgress;
+        _edgeRevealTransitionDurationMs = targetProgress > _edgeRevealFromProgress ? 245 : 165;
+        _edgeRevealTransitionStartedAt = DateTime.UtcNow;
+        _edgeRevealTransitionActive = true;
+        CompositionTarget.Rendering += EdgeRevealTransition_Rendering;
+    }
+
+    private void EdgeRevealTransition_Rendering(object? sender, EventArgs e)
+    {
+        if (!_edgeRevealTransitionActive)
+        {
+            return;
+        }
+
+        var elapsedMs = (DateTime.UtcNow - _edgeRevealTransitionStartedAt).TotalMilliseconds;
+        var t = Math.Clamp(elapsedMs / _edgeRevealTransitionDurationMs, 0, 1);
+        var revealing = _edgeRevealToProgress > _edgeRevealFromProgress;
+        var amount = revealing
+            ? EdgeRevealProfile.EaseReveal(t)
+            : 1.0 - EdgeRevealProfile.EaseHide(t);
+
+        _edgeRevealProgress = Lerp(_edgeRevealFromProgress, _edgeRevealToProgress, amount);
+        UpdateGeometry();
+
+        if (t < 1)
+        {
+            return;
+        }
+
+        _edgeRevealProgress = _edgeRevealToProgress;
+        StopEdgeRevealTransition();
+        UpdateGeometry();
+    }
+
+    private void StopEdgeRevealTransition()
+    {
+        if (!_edgeRevealTransitionActive)
+        {
+            return;
+        }
+
+        CompositionTarget.Rendering -= EdgeRevealTransition_Rendering;
+        _edgeRevealTransitionActive = false;
     }
 
     private void ApplyCompactContent(bool immediate)
@@ -613,7 +691,8 @@ public partial class MainWindow
         var geometry = IslandGeometryFactory.Create(
             _settings.Style,
             new Size(ActualWidth, ActualHeight),
-            _shapeExpansionProgress);
+            _shapeExpansionProgress,
+            _settings.Style == IslandStyle.Notch ? _edgeRevealProgress : 1.0);
         SurfacePath.Data = geometry;
         ContentHost.Clip = geometry;
 

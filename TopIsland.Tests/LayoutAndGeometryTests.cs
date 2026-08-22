@@ -90,6 +90,47 @@ public sealed class LayoutAndGeometryTests
             }
         }
     }
+
+    [Fact]
+    public void NotchTopEdgeRevealGrowsDownFromScreenBoundary()
+    {
+        var size = new Size(352, 56);
+        var quarter = IslandGeometryFactory.Create(IslandStyle.Notch, size, 0.0, 0.25);
+        var full = IslandGeometryFactory.Create(IslandStyle.Notch, size, 0.0, 1.0);
+
+        Assert.Equal(0, quarter.Bounds.Top, 6);
+        Assert.Equal(0, full.Bounds.Top, 6);
+        Assert.InRange(quarter.Bounds.Bottom, 9.5, 10.5);
+        Assert.Equal(40, full.Bounds.Bottom, 3);
+        Assert.True(quarter.Bounds.Bottom < full.Bounds.Bottom);
+    }
+
+    [Fact]
+    public void NotchTopEdgeRevealCanBecomeFullyHiddenWithoutMovingItsAnchor()
+    {
+        var hidden = IslandGeometryFactory.Create(IslandStyle.Notch, new Size(352, 56), 0.0, 0.0);
+        Assert.True(hidden.Bounds.IsEmpty);
+    }
+
+    [Fact]
+    public void EdgeRevealProfileIsMonotonicAndShouldersLagBody()
+    {
+        var previous = 0.0;
+        for (var i = 1; i <= 20; i++)
+        {
+            var t = i / 20.0;
+            var current = EdgeRevealProfile.EaseReveal(t);
+            Assert.True(current >= previous);
+            Assert.InRange(EdgeRevealProfile.ShoulderScale(current), 0, current + 0.000001);
+            previous = current;
+        }
+
+        Assert.Equal(0, EdgeRevealProfile.EaseReveal(0), 8);
+        Assert.Equal(1, EdgeRevealProfile.EaseReveal(1), 8);
+        Assert.Equal(1, EdgeRevealProfile.EaseHide(0), 8);
+        Assert.Equal(0, EdgeRevealProfile.EaseHide(1), 8);
+    }
+
     [Theory]
     [InlineData(0.0, 0.0)]
     [InlineData(1.0, 1.0)]
