@@ -71,10 +71,10 @@ Expanded Notch follows the BoringNotch relationship:
 - Authentic Notch: artwork/app icon + one compact status, currently time
 - Compact: add primary title
 - Standard: add subtitle/source when space allows
-- Idle >= 520 dip: allow compact CPU/RAM as clipped 270-degree tachometer arcs; do not use full 360-degree rings in the compact shell
+- Idle >= 520 dip: allow compact CPU/RAM as clipped 270-degree tachometer arcs; do not use full 360-degree rings in the compact shell. Sample changes should interpolate briefly instead of snapping.
 - Peek >= 430 dip: allow compact CPU/RAM
 - Hover/Peek: a running Focus timer gets the dedicated remaining-time + Pause/Resume control; otherwise show at most one lower-priority activity summary at Standard width
-- Expanded: the top row is Context/Now Playing, a large clock-centered Overview (CPU/GPU/RAM, power/thermal summary, live Discord voice controls), and Notifications when real notifications exist. The lower row is Timers, a SESSION lane using live foreground-process telemetry that is replaced by Downloads only while bytes are actively changing, and compact Storage/Network/Hardware metrics.
+- Expanded: the top row is Context/Now Playing, a large clock-centered Overview (CPU/GPU/RAM, power/thermal summary, live Discord voice controls or real audio output/volume when not in voice), and Notifications when real notifications exist. The lower row is Timers, a SESSION lane using live foreground-process telemetry that is replaced by Downloads only while bytes are actively changing, and compact Storage/Network/Hardware/Uptime metrics.
 
 Do not scale typography down to preserve content. Remove lower-priority content instead.
 

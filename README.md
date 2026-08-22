@@ -31,8 +31,9 @@ TopIsland currently uses real Windows/application data for:
 - Windows GMTC media title, source, artwork, playback position, interactive seek and Previous / Play-Pause / Next
 - Foreground application title, process and executable icon; Expanded also shows live foreground-process CPU, memory and process uptime in the SESSION lane when no download is active
 - **CPU / GPU / RAM** usage
-- Compact CPU/RAM use a clipped **270-degree tachometer sweep**: usage climbs clockwise from the lower-left across the top instead of behaving like a full circular progress ring
+- Compact CPU/RAM use a clipped **270-degree tachometer sweep**: usage climbs clockwise from the lower-left across the top, with short ease-out interpolation so live samples move like gauges instead of jumping between values
 - **Discord VC** from the live Discord Desktop accessibility tree, including hidden/tray-minimized Electron windows, channel/server, participant count, Mute/Deafen state and real Mute / Deafen / Leave controls when Discord exposes those UIA patterns
+- Default Windows audio output and master volume in Expanded when Discord voice is not occupying that Overview slot
 - Network download/upload throughput
 - System-drive free/total storage
 - Active browser/download-manager partial downloads, including current bytes and measured transfer speed when available
@@ -49,7 +50,7 @@ Notification permission is never requested automatically. If access is not alrea
 - **Hover** — subtly wider/deeper
 - Hover gives a running Focus timer its own remaining-time + real Pause/Resume control before lower-priority activity text
 - **Peek** — reveals selected lower-priority information without opening the full surface
-- **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM and Discord voice controls, and Notifications when present. The lower row is Timers, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware
+- **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM, Power/Thermal and Discord voice controls (or Output/Volume when not in voice), plus Notifications when present. The lower row is Timers, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware/Uptime
 
 Smaller widths remove information instead of shrinking every label. When no download is moving, the lower middle lane shows the foreground **SESSION** (process, memory, CPU, threads and uptime); an actively changing partial download replaces that lane instead of creating another permanent card. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. Its right-edge settings gear opens the same real TopIsland context menu used by the tray/overlay. The Expanded clock remains the visual anchor above the two-row information layout.
 

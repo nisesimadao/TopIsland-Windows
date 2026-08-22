@@ -31,7 +31,9 @@ TopIslandは、Windowsの画面上部中央に常駐し、必要なときだけ�
 - Windows GMTCのメディア情報、アートワーク、再生位置、実操作できるSeek、Previous / Play-Pause / Next
 - 前面アプリ名、プロセス、実行ファイルアイコン。ExpandedではDownloadがない時にSESSIONとして前面プロセスのCPU、実メモリ、プロセス起動時間も表示
 - **CPU / GPU / RAM**
+- CompactのCPU/RAMは**270度のタコメーター型アーク**で、左下から上を通って右下へ増加し、実測値の更新も短いEase-outで滑らかに追従
 - **Discord VC** — Discord Desktopの表示中/トレイ格納中Electron windowからVC名、サーバー、参加人数、自分のMute/Deafen状態をWindows UI Automationで読み取り、Discord側がUIA操作を公開している場合はMute / Deafen / Leaveも実操作します
+- Discord VCがない時はExpanded中央下に既定のWindows出力デバイス名とMaster Volumeを表示
 - NetworkのDownload / Upload速度
 - システムドライブの空き容量 / 総容量
 - `.crdownload` / `.part`など実際に進行しているDownloadと実測転送速度
@@ -47,7 +49,7 @@ Windows通知の権限は起動時に勝手に要求しません。許可がな�
 - **Idle** — Media/Active App、時計、幅に余裕があれば上へ見切れたタコメーター型CPU/RAMアークと通知/Downloadインジケータ
 - **Hover** — わずかに広く・深くなる
 - **Peek** — Full Expandせず、優先度の低い情報を少し追加
-- **Expanded** — 上段は Context / Now Playing、中央の大きな時計＋CPU/GPU/RAM＋Power/温度＋Discord VC操作、通知がある時だけNotifications。下段はTimers、通常時はSESSION、Download中だけDOWNLOADSへ置換、右にStorage / Network / Hardwareです
+- **Expanded** — 上段は Context / Now Playing、中央の大きな時計＋CPU/GPU/RAM＋Power/温度＋Discord VC操作（VCがない時はOutput/Volume）、通知がある時だけNotifications。下段はTimers、通常時はSESSION、Download中だけDOWNLOADSへ置換、右にStorage / Network / Hardware/Uptimeです
 
 幅が狭い場合は文字を無理に縮めず、優先度の低い情報を落とします。空モジュールは場所を取りません。Downloadsはpartial fileが実際に更新中の時だけ表示し、それ以外は同じ中央レーンをSESSION（前面プロセスのCPU/メモリ/起動時間）として使います。Discord操作はVC接続中だけ、Notificationsは存在する時だけ表示します。Full Widthでは余った中央をFocus / Voice / Downloads / Network / Storageに使い、Media本文を横へ引き伸ばしません。
 
