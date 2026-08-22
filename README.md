@@ -1,9 +1,9 @@
-﻿<p align="center">
+<p align="center">
   <img src="assets/banner.svg" alt="TopIsland" width="100%">
 </p>
 
 <p align="center">
-  <a href="README.ja.md">譌･譛ｬ隱・/a> ﾂｷ English
+  <a href="README.ja.md">日本語</a> · English
 </p>
 
 <p align="center">
@@ -31,6 +31,7 @@ TopIsland currently uses real Windows/application data for:
 - Windows GMTC media title, source, artwork, playback position and Previous / Play-Pause / Next
 - Foreground application title, process and executable icon when there is no active media session
 - **CPU / GPU / RAM** usage
+- **Discord VC** from the live Discord Desktop accessibility tree, including hidden/tray-minimized Electron windows, channel/server, participant count, Mute/Deafen state and real Mute / Deafen / Leave controls when Discord exposes those UIA patterns
 - Network download/upload throughput
 - System-drive free/total storage
 - Active browser/download-manager partial downloads, including current bytes and measured transfer speed when available
@@ -43,25 +44,32 @@ Notification permission is never requested automatically. If access is not alrea
 
 ## Interaction states
 
-- **Idle** 窶・minimum information for the selected width
-- **Hover** 窶・subtly wider/deeper
-- **Peek** 窶・reveals selected lower-priority information without opening the full surface
-- **Expanded** 窶・media/context row plus one lower information lane separated only by hairline dividers
+- **Idle** — minimum information for the selected width
+- **Hover** — subtly wider/deeper
+- **Peek** — reveals selected lower-priority information without opening the full surface
+- **Expanded** — context/media and System stay primary; active Downloads and Discord voice join only when real data exists, with Timers / Storage / optional Notifications / Battery in the lower lane
 
-Smaller widths remove information instead of shrinking every label. Expanded grows to a readable minimum width for its four regions; Full Width may reveal extra network/storage/activity status without stretching artwork, text, or progress controls.
+Smaller widths remove information instead of shrinking every label. Empty modules do not reserve space: Downloads exists only while a partial download is actively changing, Discord appears only while voice is connected, and optional notification/battery lanes collapse when unavailable. Full Width may reveal extra network/storage/activity status without stretching artwork, text, or progress controls.
 
 ## Screenshots
 
 <table>
   <tr>
-    <td align="center"><b>Dynamic Island ﾂｷ Expanded</b></td>
-    <td align="center"><b>Notch ﾂｷ Authentic</b></td>
+    <td align="center"><b>Dynamic Island · Material You</b></td>
+    <td align="center"><b>Notch · Glass / Live Blur</b></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/dynamic-expanded.png" alt="TopIsland Dynamic Island expanded"></td>
     <td><img src="docs/screenshots/notch-expanded.png" alt="TopIsland Notch expanded with Glass live blur"></td>
   </tr>
 </table>
+
+<p align="center">
+  <b>Full Width · Material You</b><br>
+  <img src="docs/screenshots/fullwidth-materialyou.png" alt="TopIsland Full Width compact Material You" width="100%">
+</p>
+
+> Repository screenshots are real runtime captures. Privacy-sensitive notification/voice labels are pixelated before commit.
 
 ## System tray
 
@@ -86,13 +94,13 @@ The WPF host and the blur helper are **PerMonitorV2**. TopIsland reads each moni
 
 Current display modes:
 
-- **Follow active app** 窶・follow the monitor containing the foreground window
+- **Follow active app** — follow the monitor containing the foreground window
 - **Primary display**
-- **Fixed display** 窶・pin TopIsland to a selected connected monitor
+- **Fixed display** — pin TopIsland to a selected connected monitor
 
 A follow transition fades out briefly, moves/recalculates for the destination DPI, then fades back in instead of sliding through unrelated monitor coordinate spaces.
 
-The current development machine verifies a 3840ﾃ・160 display at 150% and a 2560ﾃ・440 display at 125%.
+The current development machine verifies a 2560×1440 display at 150% and a 2048×1152 display at 125%.
 
 ## Design baseline
 
@@ -127,7 +135,7 @@ TopIsland intentionally does not apply the native DWM backdrop directly to the t
 3. clips the result to the exact Dynamic Island or inverse-radius Notch path with per-pixel alpha,
 4. places that blur surface directly below the WPF text/controls.
 
-This keeps the real geometry and click-through padding intact without a gray rectangle around it. The helper updates around 30 fps for normal surfaces and reduces the update rate for very large Full Width surfaces. On the current development PC, measured BlurHost usage is roughly **1% CPU and 40窶・0 MB working set** in representative Standard/Full Width cases.
+This keeps the real geometry and click-through padding intact without a gray rectangle around it. The helper stays responsive while the shell is moving, then reduces its refresh rate after the geometry settles. It also reuses Skia objects and blurs a half-resolution working surface before compositing at full resolution. On the current development PC, representative Glass Expanded measurements are roughly **1.8% normalized CPU / 55–60 MB working set** at Standard width and about **2.8% CPU** at Full Width. These are prototype measurements, not a hardware-independent target.
 
 If BlurHost is unavailable, TopIsland automatically falls back to the denser non-blurred material tint instead of leaving the surface unreadable.
 
@@ -179,4 +187,4 @@ Local installation uses `%LOCALAPPDATA%\Programs\TopIsland` and creates a Start 
 
 ## Status
 
-TopIsland is still an interactive prototype, but its core overlay is functional: media/foreground context, the four-region Expanded layout, Discord voice-state reading, focus/download monitoring, Windows notification reading when permitted, geometry/motion, click-through and no-activate behavior, system-tray configuration, persistence, multi-display placement, PerMonitorV2 scaling, Material You dynamic color, and shape-clipped live blur materials are working.
+TopIsland is still an interactive prototype, but its core overlay is functional: media/foreground context, the contextual Expanded layout, hidden-window Discord voice-state/control integration, focus/download monitoring, Windows notification reading when permitted, geometry/motion, click-through and no-activate behavior, system-tray configuration, persistence, multi-display placement, PerMonitorV2 scaling, Material You dynamic color, and shape-clipped live blur materials are working.

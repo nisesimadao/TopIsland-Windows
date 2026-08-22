@@ -73,7 +73,7 @@ Expanded Notch follows the BoringNotch relationship:
 - Standard: add subtitle/source when space allows
 - Idle >= 520 dip: allow compact CPU/RAM
 - Peek >= 430 dip: allow compact CPU/RAM
-- Expanded: four primary regions: Now Playing, System, Downloads, and Communication. The lower lane is reserved for Focus, Storage, Notifications, and Battery when available.
+- Expanded: Context/Now Playing and System are the stable primary regions. Active Downloads and connected Communication join only while their real data exists; the lower lane holds Timers, Storage, and optional Notifications/Battery.
 
 Do not scale typography down to preserve content. Remove lower-priority content instead.
 
@@ -122,6 +122,7 @@ Before merging visual changes:
 - Secondary/source text is smaller and quieter; it must not compete with the title.
 - Clock and changing numeric telemetry use tabular numeral alignment so updates do not shift the layout.
 - Expanded content fades and moves only a few device-independent pixels.
+- Shell morphs use one restrained ease-out profile (power 2.2) across size/position/shape, with shorter durations for Hover/Peek and no spring overshoot. Mid-transition reversals resume from the mathematically current interpolated rectangle instead of a potentially stale WPF `ActualWidth`.
 - Avoid large slides, bounce, scale pulses, and decorative spring overshoot.
 - Compact and Expanded are alternate presentations of the same surface; do not show both information layouts at once.
 - Hover should feel like a subtle increase in presence, not a separate card appearing.
@@ -169,13 +170,13 @@ The overlay is an information surface, not the settings window.
 
 More information is allowed only when the surface has enough room and the data is real.
 
-- Expanded uses four primary regions on the main row, separated by vertical hairlines, plus one secondary information lane separated by a horizontal hairline.
+- Expanded has a stable context/media region and System region. Downloads and Communication are conditional main-row modules that allocate width only while their real activity exists. A lower lane holds Timers, Storage, and optional Notifications/Battery.
 - Secondary groups use vertical hairlines and spacing, not rounded card containers.
-- Current main-row modules are Now Playing, System, Downloads, and Communication. The lower lane contains Focus, Storage, Notifications, and Battery when present.
+- Downloads must disappear when no partial download is actively changing; a stale `.crdownload`/`.part` file is not enough to justify a module. Communication must disappear when Discord is not in voice.
 - CPU/GPU/RAM are three small aligned metrics with restrained progress bars; Network stays compact telemetry. Do not turn them into separate dashboard cards.
 - Hide a module when the underlying capability is unavailable (for example, Battery on a desktop or Notifications without permission).
 - Never invent download progress, notification content, Discord voice state, battery state, or other live values.
-- Discord voice information must come from the live Discord desktop UI tree. Show channel/server/participants/mute-deafen state only when observed; do not fabricate call controls or participant state.
+- Discord voice information must come from the live Discord desktop UI tree, including hidden/tray-minimized `Chrome_WidgetWin_1` windows when `MainWindowHandle` is zero. Show only observed channel/server/count/mute-deafen state. Enable Mute/Deafen/Leave controls only when Discord exposes the matching UI Automation pattern; do not fabricate controls or participant state.
 - Full Width may reveal extra NET / SSD / notification activity, but smaller widths remove those details.
 - A future module must justify its space with current or actionable information; an empty placeholder is not a reason to add another container.
 - Windows notification permission must be opt-in. Do not request it automatically at startup.
@@ -188,12 +189,12 @@ Blur must support the surface geometry rather than redefine it.
 - `Solid` remains the reference material, especially for Notch.
 - `Mica` remains a denser non-live surface.
 - `Acrylic` and `Glass` may use the external BlurHost renderer.
-- `Material You` is not a glass material. It uses a Material 3 HCT/TonalSpot dynamic scheme and semantic surface/container/state-layer roles; BlurHost must stay off.
+- `Material You` is not a glass material. It uses a Material 3 HCT/TonalSpot dynamic scheme and semantic surface/container/state-layer roles; BlurHost must stay off. Primary actions may use `PrimaryContainer`; accent color must not become a full-surface wash.
 - BlurHost captures only the TopIsland rectangle behind the layered windows; it must never capture the full desktop unnecessarily.
 - The blur output uses per-pixel alpha and the same Dynamic Island / inverse-radius Notch geometry as the WPF hit-test surface.
 - Never accept a rectangular DWM/Acrylic backdrop leaking outside the shape.
 - Acrylic/Glass differences should come primarily from blur radius and tint density. Material You instead follows Material 3 semantic color roles and state layers. Avoid decorative glass cards and arbitrary accent washes.
 - Text/control contrast is owned by the WPF foreground layer; the background blur must remain subordinate.
 - If BlurHost is unavailable, use the readable static fallback tint instead of partially broken transparency.
-- Normal surfaces target roughly 30 fps; very large surfaces may reduce the blur refresh rate to limit CPU use.
+- BlurHost may render around 30 fps while geometry is moving, then reduce refresh after the shell settles. Skia objects/buffers should be reused, and backdrop blur may use a half-resolution working surface before full-resolution shape compositing.
 - BlurHost must be click-through/no-activate and remain directly below the TopIsland foreground window.

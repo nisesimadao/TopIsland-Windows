@@ -31,7 +31,7 @@ TopIslandは、Windowsの画面上部中央に常駐し、必要なときだけ�
 - Windows GMTCのメディア情報、アートワーク、再生位置、Previous / Play-Pause / Next
 - メディアがない場合の前面アプリ名、プロセス、実行ファイルアイコン
 - **CPU / GPU / RAM**
-- **Discord VC** — Discord Desktopから現在のVC名、サーバー、参加人数/参加者、自分のMute/Deafen状態をWindows UI Automationで読み取ります
+- **Discord VC** — Discord Desktopの表示中/トレイ格納中Electron windowからVC名、サーバー、参加人数、自分のMute/Deafen状態をWindows UI Automationで読み取り、Discord側がUIA操作を公開している場合はMute / Deafen / Leaveも実操作します
 - NetworkのDownload / Upload速度
 - システムドライブの空き容量 / 総容量
 - `.crdownload` / `.part`など実際に進行しているDownloadと実測転送速度
@@ -47,9 +47,9 @@ Windows通知の権限は起動時に勝手に要求しません。許可がな�
 - **Idle** — 選択中の幅に必要な最小情報
 - **Hover** — わずかに広く・深くなる
 - **Peek** — Full Expandせず、優先度の低い情報を少し追加
-- **Expanded** — **Now Playing / System / Downloads / Communication** の4領域と、Focus / Storage / Notifications / Batteryの下段レーン。角丸カードを大量に並べず、細いdividerで区切ります
+- **Expanded** — Context/Now PlayingとSystemを軸に、**実際に動いているDownload**と**接続中Discord VC**だけを必要時に追加。下段はTimers / Storage / optional Notifications / Batteryを細いdividerで区切ります
 
-幅が狭い場合は文字を無理に縮めず、優先度の低い項目を消します。Full WidthではNetwork / Storage / Activityなどを追加できますが、Media本文やProgressBarそのものを画面幅まで引き伸ばしません。
+幅が狭い場合は文字を無理に縮めず、優先度の低い項目を消します。空モジュールは場所を取りません。Downloadsはpartial fileが実際に更新されている間だけ、DiscordはVC接続中だけ表示します。Full WidthではNetwork / Storage / Activityなどを追加できますが、Media本文やProgressBarそのものを画面幅まで引き伸ばしません。
 
 ## Screenshots
 
@@ -63,6 +63,13 @@ Windows通知の権限は起動時に勝手に要求しません。許可がな�
     <td><img src="docs/screenshots/notch-expanded.png" alt="TopIsland Notch expanded with Glass live blur"></td>
   </tr>
 </table>
+
+<p align="center">
+  <b>Full Width · Material You</b><br>
+  <img src="docs/screenshots/fullwidth-materialyou.png" alt="TopIsland Full Width compact Material You" width="100%">
+</p>
+
+> リポジトリの画像は実動作キャプチャです。通知本文やVCの個人情報にあたる箇所だけ、commit前にピクセル化しています。
 
 ## システムトレイ
 
@@ -93,7 +100,7 @@ Displayは次から選べます。
 
 別DPIのモニターへ移動するときは、無理に横スライドさせず短くFade Outし、移動先DPIで再計算してFade Inします。
 
-開発機では3840×2160 @ 150%と2560×1440 @ 125%の組み合わせで確認しています。
+開発機では2560×1440 @ 150%と2048×1152 @ 125%の組み合わせで確認しています。
 
 ## デザイン基準
 
@@ -130,7 +137,7 @@ Notchの基準は`Solid`黒です。`Mica`は密度の高いオプションSurfa
 
 という処理を行います。
 
-これにより矩形の灰色Backdropを出さず、逆Rやクリック透過用余白を維持できます。通常サイズは約30fps、巨大なFull Widthでは更新頻度を少し下げています。開発機では代表的なStandard / Full Width状態でBlurHostは概ね**CPU約1%、Working Set 40〜50MB**でした。
+これにより矩形の灰色Backdropを出さず、逆Rやクリック透過用余白を維持できます。移動/変形中は追従性を優先し、静止後はBlur更新頻度を落とします。またSkiaオブジェクトを再利用し、半解像度の作業面でBlurしてからフル解像度へ合成します。現在の開発機ではGlass Expandedの代表値として、Standardで**正規化CPU約1.8%、Working Set約55〜60MB**、Full Widthで**CPU約2.8%**でした。プロトタイプ上の実測値であり、固定性能目標ではありません。
 
 BlurHostが見つからない/起動できない場合は、文字が読めなくならないよう従来の濃い非Blur Materialへ自動fallbackします。
 
@@ -182,4 +189,4 @@ powershell -ExecutionPolicy Bypass -File scripts/uninstall-local.ps1
 
 ## 現在の状態
 
-まだ完成版ではありませんが、Media/前面アプリ、CPU/GPU/RAM/Network/Storage、Focus/Download監視、許可済みWindows通知、Notch/Dynamic geometry、Hover/Peek/Expanded motion、クリック透過、フォーカス維持、Tray設定、設定保存、マルチモニター、PerMonitorV2、shape-clipped Live Blurまで動作しています。
+まだ完成版ではありませんが、Media/前面アプリ、CPU/GPU/RAM/Network/Storage、Focus/Download監視、許可済みWindows通知、hidden Discord windowを含むVC状態/操作、Notch/Dynamic geometry、Hover/Peek/Expanded motion、クリック透過、フォーカス維持、Tray設定、設定保存、マルチモニター、PerMonitorV2、Material You、shape-clipped Live Blurまで動作しています。
