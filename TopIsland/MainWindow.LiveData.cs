@@ -330,9 +330,12 @@ public partial class MainWindow
             ContextColumn.Width = new GridLength(isMedia ? 1.10 : 0.80, GridUnitType.Star);
             OverviewColumn.MinWidth = isMedia ? 292 : 320;
             OverviewColumn.Width = new GridLength(isMedia ? 1.02 : 1.18, GridUnitType.Star);
-            ExpandedArtworkBorder.Width = isMedia ? 100 : 72;
-            ExpandedArtworkBorder.Height = isMedia ? 112 : 72;
-            ExpandedArtworkBorder.CornerRadius = new CornerRadius(isMedia ? 14 : 15);
+            ExpandedArtworkBorder.Width = isMedia ? 100 : 68;
+            ExpandedArtworkBorder.Height = isMedia ? 112 : 68;
+            ExpandedArtworkBorder.CornerRadius = new CornerRadius(isMedia ? 14 : 14);
+            ExpandedMediaTitle.FontSize = isMedia ? 16 : 14.5;
+            ExpandedMediaTitle.TextWrapping = isMedia ? TextWrapping.NoWrap : TextWrapping.Wrap;
+            ExpandedMediaTitle.MaxHeight = isMedia ? double.PositiveInfinity : 38;
             ApplyArtwork(artwork, isMedia);
             MediaSeekSlider.Value = media.Progress;
             MediaSeekSlider.Visibility = media.HasSession ? Visibility.Visible : Visibility.Collapsed;
@@ -494,10 +497,23 @@ public partial class MainWindow
                 ? string.Join(" \u00B7 ", thermal)
                 : "Temperature unavailable";
 
-            var overviewHardware = new List<string> { hardware.PowerMode };
-            if (stats.HasBattery) overviewHardware.Add($"Battery {stats.BatteryPercent:0}%");
-            else if (hardware.GpuTemperatureC is double overviewGpuTemp) overviewHardware.Add($"GPU {overviewGpuTemp:0}\u00B0C");
-            OverviewHardwareText.Text = string.Join(" \u00B7 ", overviewHardware);
+            OverviewPowerText.Text = hardware.PowerMode;
+            if (stats.HasBattery)
+            {
+                OverviewThermalLabel.Text = "BATTERY";
+                OverviewThermalText.Text = stats.BatteryCharging
+                    ? $"{stats.BatteryPercent:0}% · charging"
+                    : $"{stats.BatteryPercent:0}%";
+            }
+            else
+            {
+                OverviewThermalLabel.Text = "THERMAL";
+                OverviewThermalText.Text = hardware.GpuTemperatureC is double overviewGpuTemp
+                    ? $"GPU {overviewGpuTemp:0}\u00B0C"
+                    : hardware.CpuTemperatureC is double overviewCpuTemp
+                        ? $"CPU {overviewCpuTemp:0}\u00B0C"
+                        : "Unavailable";
+            }
         }
         else if (_hardwareTelemetryService is not null)
         {

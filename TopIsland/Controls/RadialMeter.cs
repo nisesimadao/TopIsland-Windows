@@ -97,16 +97,16 @@ public sealed class RadialMeter : FrameworkElement
         const double startAngle = 135;
         const double sweepAngle = 270;
         var radius = Math.Max(7, Math.Min(ActualWidth, ActualHeight) / 2 - 3.0);
-        var center = new Point(ActualWidth / 2 - 1.0, ActualHeight / 2 + 1.5);
+        var center = new Point(ActualWidth / 2 - 1.0, ActualHeight / 2 - 1.5);
         var trackPen = CreatePen(TrackBrush, 2.35);
         var progressPen = CreatePen(ProgressBrush, 3.1);
 
         dc.DrawGeometry(null, trackPen, CreateArc(center, radius, startAngle, sweepAngle));
 
         var tickPen = new Pen(TrackBrush, 1.0);
-        for (var index = 0; index <= 5; index++)
+        for (var index = 0; index <= 6; index++)
         {
-            var angle = startAngle + sweepAngle * index / 5.0;
+            var angle = startAngle + sweepAngle * index / 6.0;
             var outer = PointOnCircle(center, radius + 0.2, angle);
             var inner = PointOnCircle(center, radius - 2.6, angle);
             dc.DrawLine(tickPen, inner, outer);

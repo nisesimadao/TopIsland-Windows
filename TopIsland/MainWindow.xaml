@@ -184,7 +184,7 @@
 
                 <Border Grid.Column="4" Width="1" HorizontalAlignment="Left" Background="{DynamicResource DividerBrush}" Margin="0,5,0,5"/>
                 <Grid Grid.Column="4" Height="34" Width="78" ClipToBounds="True" VerticalAlignment="Center" Margin="6,0,0,0">
-                    <StackPanel x:Name="CompactMetersPanel" Orientation="Horizontal" VerticalAlignment="Top" Visibility="Collapsed" Margin="-3,-7,0,0">
+                    <StackPanel x:Name="CompactMetersPanel" Orientation="Horizontal" VerticalAlignment="Top" Visibility="Collapsed" Margin="-3,-4,0,0">
                         <controls:RadialMeter x:Name="CompactCpuMeter" Width="39" Height="39" ShowLabel="False" IsTachometer="True" Value="0" ProgressBrush="{DynamicResource AccentBrush}" TrackBrush="{DynamicResource DividerBrush}" TextBrush="{DynamicResource PrimaryTextBrush}" SecondaryTextBrush="{DynamicResource TertiaryTextBrush}" Margin="0,0,1,0"/>
                         <controls:RadialMeter x:Name="CompactRamMeter" Width="39" Height="39" ShowLabel="False" IsTachometer="True" Value="0" ProgressBrush="{DynamicResource AccentBrush}" TrackBrush="{DynamicResource DividerBrush}" TextBrush="{DynamicResource PrimaryTextBrush}" SecondaryTextBrush="{DynamicResource TertiaryTextBrush}"/>
                     </StackPanel>
@@ -274,7 +274,17 @@
                                 <controls:RadialMeter x:Name="RamRadialMeter" Width="50" Height="50" Label="RAM" Value="0" ProgressBrush="{DynamicResource AccentBrush}" TrackBrush="{DynamicResource DividerBrush}" TextBrush="{DynamicResource PrimaryTextBrush}" SecondaryTextBrush="{DynamicResource TertiaryTextBrush}" HorizontalAlignment="Center"/>
                             </UniformGrid>
                         </Grid>
-                        <TextBlock x:Name="OverviewHardwareText" Grid.Row="1" Text="Power mode" FontSize="8.5" Foreground="{DynamicResource TertiaryTextBrush}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+                                                <Grid Grid.Row="1" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="POWER" FontSize="7.5" Foreground="{DynamicResource TertiaryTextBrush}"/>
+                                <TextBlock x:Name="OverviewPowerText" Text="Balanced" FontSize="9" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                <TextBlock x:Name="OverviewThermalLabel" Text="THERMAL" FontSize="7.5" Foreground="{DynamicResource TertiaryTextBrush}"/>
+                                <TextBlock x:Name="OverviewThermalText" Text="--" FontSize="9" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Grid>
                         <Grid x:Name="DiscordVoiceGroup" Grid.Row="2" Margin="0,5,0,0" Visibility="Collapsed">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center" MinWidth="0">
