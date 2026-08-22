@@ -171,6 +171,20 @@ public sealed class MonitorService
         _ = SetWindowPos(hwnd, IntPtr.Zero, x, y, 0, 0, SwpNoSize | SwpNoZOrder | SwpNoActivate);
     }
 
+    public void PositionAndSizeWindow(IntPtr hwnd, MonitorDescriptor monitor, double topDip, double widthDip, double heightDip)
+    {
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var width = Math.Max(1, (int)Math.Round(widthDip * monitor.Scale));
+        var height = Math.Max(1, (int)Math.Round(heightDip * monitor.Scale));
+        var x = monitor.Left + (monitor.PixelWidth - width) / 2;
+        var y = monitor.Top + (int)Math.Round(topDip * monitor.Scale);
+        _ = SetWindowPos(hwnd, IntPtr.Zero, x, y, width, height, SwpNoZOrder | SwpNoActivate);
+    }
+
     private MonitorDescriptor? Describe(IntPtr monitor)
     {
         if (monitor == IntPtr.Zero)

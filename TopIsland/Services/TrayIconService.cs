@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using Forms = System.Windows.Forms;
 using TopIsland.Models;
 
@@ -27,11 +27,7 @@ public sealed class TrayIconService : IDisposable
 
         _menu.Opening += (_, _) => RebuildMenu();
         _notifyIcon.DoubleClick += (_, _) => Dispatch(_window.ToggleVisibilityFromTray);
-        _window.SettingsChanged += Window_SettingsChanged;
-        RebuildMenu();
     }
-
-    private void Window_SettingsChanged(object? sender, EventArgs e) => RebuildMenu();
 
     private void RebuildMenu()
     {
@@ -89,7 +85,7 @@ public sealed class TrayIconService : IDisposable
         for (var i = 0; i < monitors.Count; i++)
         {
             var monitor = monitors[i];
-            var label = $"Display {i + 1} ﾂｷ {monitor.DisplayLabel}" + (monitor.IsPrimary ? " ﾂｷ Primary" : string.Empty);
+            var label = $"Display {i + 1} \u00B7 {monitor.DisplayLabel}" + (monitor.IsPrimary ? " \u00B7 Primary" : string.Empty);
             displayMenu.DropDownItems.Add(CheckedItem(
                 label,
                 settings.MonitorMode == MonitorMode.Fixed && string.Equals(settings.MonitorDeviceName, monitor.DeviceName, StringComparison.OrdinalIgnoreCase),
@@ -166,7 +162,6 @@ public sealed class TrayIconService : IDisposable
 
     public void Dispose()
     {
-        _window.SettingsChanged -= Window_SettingsChanged;
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _menu.Dispose();

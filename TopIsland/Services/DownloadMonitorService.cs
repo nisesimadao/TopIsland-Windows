@@ -3,9 +3,15 @@ using System.Runtime.InteropServices;
 
 namespace TopIsland.Services;
 
-public sealed record DownloadSnapshot(int ActiveCount, string PrimaryName, long PrimaryBytes, double PrimaryMegabytesPerSecond)
+public sealed record DownloadItemSnapshot(string Name, long Bytes, double MegabytesPerSecond);
+public sealed record DownloadSnapshot(IReadOnlyList<DownloadItemSnapshot> Items)
 {
-    public bool HasActive => ActiveCount > 0;
+    public int ActiveCount => Items.Count;
+    public bool HasActive => Items.Count > 0;
+    public DownloadItemSnapshot? Primary => Items.FirstOrDefault();
+    public string PrimaryName => Primary?.Name ?? string.Empty;
+    public long PrimaryBytes => Primary?.Bytes ?? 0;
+    public double PrimaryMegabytesPerSecond => Primary?.MegabytesPerSecond ?? 0;
 }
 
 public sealed class DownloadMonitorService
@@ -15,81 +21,100 @@ public sealed class DownloadMonitorService
         ".crdownload", ".part", ".partial", ".download", ".opdownload"
     };
 
-    private readonly string _downloadsFolder;
-    private readonly Dictionary<string, (long Length, DateTime SampledAt)> _previous = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly TimeSpan IdleScanInterval = TimeSpan.FromSeconds(3);
+    internal static readonly TimeSpan ActivityGrace = TimeSpan.FromSeconds(12);
+    private static readonly DownloadSnapshot EmptySnapshot = new(Array.Empty<DownloadItemSnapshot>());
 
-    public DownloadMonitorService()
-    {
-        _downloadsFolder = ResolveDownloadsFolder();
-    }
+    private readonly string _downloadsFolder = ResolveDownloadsFolder();
+    private readonly Dictionary<string, (long Length, DateTime SampledAt)> _previous = new(StringComparer.OrdinalIgnoreCase);
+    private DateTime _lastDirectoryScan = DateTime.MinValue;
+    private DownloadSnapshot _cached = EmptySnapshot;
 
     public DownloadSnapshot Sample()
     {
+        var now = DateTime.UtcNow;
+
+        // A full Downloads-folder enumeration is unnecessary every second when
+        // nothing is active. Once a partial file is found we return to the
+        // caller's normal 1-second cadence so transfer-speed estimates stay useful.
+        if (!_cached.HasActive && now - _lastDirectoryScan < IdleScanInterval)
+        {
+            return _cached;
+        }
+
         try
         {
+            _lastDirectoryScan = now;
             if (!Directory.Exists(_downloadsFolder))
             {
-                return Empty();
+                _cached = EmptySnapshot;
+                return _cached;
             }
 
-            var now = DateTime.UtcNow;
             var files = new DirectoryInfo(_downloadsFolder)
                 .EnumerateFiles("*", SearchOption.TopDirectoryOnly)
                 .Where(IsPartialDownload)
-                .Where(file => now - file.LastWriteTimeUtc < TimeSpan.FromMinutes(10))
+                .Where(file => HasRecentActivity(file.LastWriteTimeUtc, now))
                 .OrderByDescending(file => file.LastWriteTimeUtc)
-                .Take(8)
+                .Take(4)
                 .ToArray();
 
             if (files.Length == 0)
             {
                 _previous.Clear();
-                return Empty();
+                _cached = EmptySnapshot;
+                return _cached;
             }
 
-            var activePaths = files.Select(f => f.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var activePaths = files.Select(file => file.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var stale in _previous.Keys.Where(path => !activePaths.Contains(path)).ToArray())
             {
                 _previous.Remove(stale);
             }
 
-            var primary = files[0];
-            double bytesPerSecond = 0;
-            if (_previous.TryGetValue(primary.FullName, out var previous))
-            {
-                var seconds = Math.Max((now - previous.SampledAt).TotalSeconds, 0.05);
-                bytesPerSecond = Math.Max(0, primary.Length - previous.Length) / seconds;
-            }
-
+            var items = new List<DownloadItemSnapshot>(files.Length);
             foreach (var file in files)
             {
+                double bytesPerSecond = 0;
+                if (_previous.TryGetValue(file.FullName, out var previous))
+                {
+                    var seconds = Math.Max((now - previous.SampledAt).TotalSeconds, 0.05);
+                    bytesPerSecond = Math.Max(0, file.Length - previous.Length) / seconds;
+                }
+
+                items.Add(new DownloadItemSnapshot(
+                    CleanDisplayName(file.Name),
+                    file.Length,
+                    bytesPerSecond / 1_000_000.0));
                 _previous[file.FullName] = (file.Length, now);
             }
 
-            return new DownloadSnapshot(
-                files.Length,
-                CleanDisplayName(primary.Name),
-                primary.Length,
-                bytesPerSecond / 1_000_000.0);
+            _cached = new DownloadSnapshot(items);
+            return _cached;
         }
         catch
         {
-            return Empty();
+            // Keep a previously observed active item for one sample instead of
+            // flashing the Downloads module off because of a transient file lock.
+            return _cached;
         }
     }
 
-    private static bool IsPartialDownload(FileInfo file)
+    private static bool IsPartialDownload(FileInfo file) =>
+        PartialExtensions.Contains(file.Extension)
+        || file.Name.EndsWith(".tmp.crdownload", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool HasRecentActivity(DateTime lastWriteUtc, DateTime nowUtc) =>
+        nowUtc >= lastWriteUtc && nowUtc - lastWriteUtc <= ActivityGrace;
+
+    internal static string CleanDisplayName(string name)
     {
-        if (PartialExtensions.Contains(file.Extension))
+        const string compoundChromeExtension = ".tmp.crdownload";
+        if (name.EndsWith(compoundChromeExtension, StringComparison.OrdinalIgnoreCase))
         {
-            return true;
+            return name[..^compoundChromeExtension.Length];
         }
 
-        return file.Name.EndsWith(".tmp.crdownload", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string CleanDisplayName(string name)
-    {
         foreach (var extension in PartialExtensions)
         {
             if (name.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
@@ -97,10 +122,9 @@ public sealed class DownloadMonitorService
                 return name[..^extension.Length];
             }
         }
+
         return name;
     }
-
-    private static DownloadSnapshot Empty() => new(0, string.Empty, 0, 0);
 
     private static string ResolveDownloadsFolder()
     {
@@ -109,7 +133,8 @@ public sealed class DownloadMonitorService
         {
             try
             {
-                return Marshal.PtrToStringUni(pathPtr) ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                return Marshal.PtrToStringUni(pathPtr)
+                       ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
             }
             finally
             {
@@ -121,5 +146,9 @@ public sealed class DownloadMonitorService
     }
 
     [DllImport("shell32.dll")]
-    private static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid rfid, uint flags, IntPtr token, out IntPtr path);
+    private static extern int SHGetKnownFolderPath(
+        [MarshalAs(UnmanagedType.LPStruct)] Guid rfid,
+        uint flags,
+        IntPtr token,
+        out IntPtr path);
 }

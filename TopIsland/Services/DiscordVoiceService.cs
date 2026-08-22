@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Automation;
 
 namespace TopIsland.Services;
@@ -11,16 +13,19 @@ public sealed record DiscordVoiceSnapshot(
     int ParticipantCount,
     string ParticipantSummary,
     bool IsMuted,
-    bool IsDeafened)
+    bool IsDeafened,
+    bool CanToggleMute,
+    bool CanToggleDeafen,
+    bool CanDisconnect)
 {
-    public static DiscordVoiceSnapshot Empty { get; } = new(false, false, string.Empty, string.Empty, 0, string.Empty, false, false);
+    public static DiscordVoiceSnapshot Empty { get; } = new(false, false, string.Empty, string.Empty, 0, string.Empty, false, false, false, false, false);
 }
 
 public sealed class DiscordVoiceService
 {
-    private static readonly string[] DisconnectNames = ["Disconnect", "切断"];
-    private static readonly string[] MuteNames = ["Mute", "Unmute", "ミュート", "ミュート解除"];
-    private static readonly string[] DeafenNames = ["Deafen", "Undeafen", "スピーカーミュート", "スピーカーミュート解除"];
+    private static readonly string[] DisconnectNames = ["Disconnect", "\u5207\u65AD"];
+    private static readonly string[] MuteNames = ["Mute", "Unmute", "\u30DF\u30E5\u30FC\u30C8", "\u30DF\u30E5\u30FC\u30C8\u89E3\u9664"];
+    private static readonly string[] DeafenNames = ["Deafen", "Undeafen", "\u30B9\u30D4\u30FC\u30AB\u30FC\u30DF\u30E5\u30FC\u30C8", "\u30B9\u30D4\u30FC\u30AB\u30FC\u30DF\u30E5\u30FC\u30C8\u89E3\u9664"];
 
     private readonly object _gate = new();
     private DiscordVoiceSnapshot _snapshot = DiscordVoiceSnapshot.Empty;
@@ -45,6 +50,7 @@ public sealed class DiscordVoiceService
             {
                 return;
             }
+
             _sampling = true;
         }
 
@@ -72,24 +78,69 @@ public sealed class DiscordVoiceService
         }
     }
 
+    public async Task<bool> ToggleMuteAsync()
+    {
+        var result = await Task.Run(() => TryToggleControl(MuteNames));
+        if (result)
+        {
+            // Give Discord's accessibility tree a moment to publish the new toggle state.
+            // The caller performs the single refresh after this delay.
+            await Task.Delay(180);
+        }
+
+        return result;
+    }
+
+    public async Task<bool> ToggleDeafenAsync()
+    {
+        var result = await Task.Run(() => TryToggleControl(DeafenNames));
+        if (result)
+        {
+            await Task.Delay(180);
+        }
+
+        return result;
+    }
+
+    public async Task<bool> DisconnectAsync()
+    {
+        var result = await Task.Run(() => TryInvokeControl(DisconnectNames));
+        if (result)
+        {
+            await Task.Delay(220);
+        }
+
+        return result;
+    }
+
     private static DiscordVoiceSnapshot SampleCore()
     {
-        var process = FindDiscordMainProcess();
-        if (process is null)
+        var target = FindDiscordWindow();
+        if (!target.IsRunning)
         {
             return DiscordVoiceSnapshot.Empty;
         }
 
-        var root = AutomationElement.FromHandle(process.MainWindowHandle);
+        if (target.Handle == IntPtr.Zero)
+        {
+            return new DiscordVoiceSnapshot(true, false, string.Empty, string.Empty, 0, string.Empty, false, false, false, false, false);
+        }
+
+        var root = AutomationElement.FromHandle(target.Handle);
         if (root is null)
         {
-            return new DiscordVoiceSnapshot(true, false, string.Empty, string.Empty, 0, string.Empty, false, false);
+            return new DiscordVoiceSnapshot(true, false, string.Empty, string.Empty, 0, string.Empty, false, false, false, false, false);
         }
 
         var elements = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
         var connected = false;
         var muted = false;
         var deafened = false;
+        var canMute = false;
+        var canDeafen = false;
+        var canDisconnect = false;
+        var activeVoiceChannel = string.Empty;
+        var extraParticipantCount = 0;
         var participants = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (var i = 0; i < elements.Count; i++)
@@ -110,98 +161,285 @@ public sealed class DiscordVoiceService
                 continue;
             }
 
-            if (IsDisconnectName(name) || name.Contains("通話中", StringComparison.OrdinalIgnoreCase) || name.Contains("Connected", StringComparison.OrdinalIgnoreCase))
+            if (IsDisconnectName(name))
+            {
+                connected = true;
+                try
+                {
+                    _ = element.GetCurrentPattern(InvokePattern.Pattern);
+                    canDisconnect = true;
+                }
+                catch
+                {
+                }
+            }
+
+            if (name.Contains("\u901A\u8A71\u4E2D", StringComparison.Ordinal)
+                || name.Contains("Connected", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("In call", StringComparison.OrdinalIgnoreCase))
             {
                 connected = true;
             }
 
-            if (name.Equals("Unmute", StringComparison.OrdinalIgnoreCase) || name.Contains("ミュート解除", StringComparison.Ordinal))
+            if (MuteNames.Any(candidate => name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
             {
-                if (!name.Contains("スピーカー", StringComparison.Ordinal))
+                try
                 {
-                    muted = true;
+                    var pattern = (TogglePattern)element.GetCurrentPattern(TogglePattern.Pattern);
+                    canMute = true;
+                    muted = pattern.Current.ToggleState == ToggleState.On;
+                }
+                catch
+                {
                 }
             }
 
-            if (name.Equals("Undeafen", StringComparison.OrdinalIgnoreCase) || name.Contains("スピーカーミュート解除", StringComparison.Ordinal))
+            if (DeafenNames.Any(candidate => name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
             {
-                deafened = true;
+                try
+                {
+                    var pattern = (TogglePattern)element.GetCurrentPattern(TogglePattern.Pattern);
+                    canDeafen = true;
+                    deafened = pattern.Current.ToggleState == ToggleState.On;
+                }
+                catch
+                {
+                }
             }
 
-            var participant = TryParseParticipant(name);
+            if (activeVoiceChannel.Length == 0
+                && DiscordVoiceParser.TryParseActiveVoiceElement(name, out var voiceChannel, out var voiceParticipants, out var extraParticipants))
+            {
+                connected = true;
+                activeVoiceChannel = voiceChannel;
+                extraParticipantCount = extraParticipants;
+                foreach (var voiceParticipant in voiceParticipants)
+                {
+                    participants.Add(voiceParticipant);
+                }
+            }
+
+            var participant = DiscordVoiceParser.TryParseParticipant(name);
             if (!string.IsNullOrWhiteSpace(participant))
             {
                 participants.Add(participant);
             }
         }
 
-        var (channel, server) = ParseWindowTitle(process.MainWindowTitle);
+        var (channel, server) = DiscordVoiceParser.ParseWindowTitle(target.Title);
+        if (!string.IsNullOrWhiteSpace(activeVoiceChannel))
+        {
+            channel = activeVoiceChannel;
+        }
+
         if (!connected)
         {
-            return new DiscordVoiceSnapshot(true, false, string.Empty, server, 0, string.Empty, muted, deafened);
+            return new DiscordVoiceSnapshot(true, false, string.Empty, server, 0, string.Empty, muted, deafened, canMute, canDeafen, canDisconnect);
         }
 
         var participantList = participants.Take(3).ToArray();
+        var participantCount = participants.Count + extraParticipantCount;
+        var hiddenParticipantCount = Math.Max(0, participantCount - participantList.Length);
         var summary = participantList.Length == 0
             ? string.Empty
-            : string.Join(", ", participantList) + (participants.Count > participantList.Length ? $" +{participants.Count - participantList.Length}" : string.Empty);
+            : string.Join(", ", participantList) + (hiddenParticipantCount > 0 ? $" +{hiddenParticipantCount}" : string.Empty);
 
         return new DiscordVoiceSnapshot(
             true,
             true,
             channel,
             server,
-            participants.Count,
+            participantCount,
             summary,
             muted,
-            deafened);
+            deafened,
+            canMute,
+            canDeafen,
+            canDisconnect);
     }
 
-    private static Process? FindDiscordMainProcess() =>
-        Process.GetProcessesByName("Discord")
-            .Where(process => process.MainWindowHandle != IntPtr.Zero)
-            .OrderByDescending(process => process.MainWindowTitle.Length)
-            .FirstOrDefault();
+    private static bool TryToggleControl(IEnumerable<string> names)
+    {
+        var target = FindDiscordWindow();
+        if (target.Handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var root = AutomationElement.FromHandle(target.Handle);
+        if (root is null)
+        {
+            return false;
+        }
+
+        var elements = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+        for (var i = 0; i < elements.Count; i++)
+        {
+            var element = elements[i];
+            string name;
+            try
+            {
+                name = element.Current.Name ?? string.Empty;
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (!names.Any(candidate => name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            try
+            {
+                var pattern = (TogglePattern)element.GetCurrentPattern(TogglePattern.Pattern);
+                pattern.Toggle();
+                return true;
+            }
+            catch
+            {
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryInvokeControl(IEnumerable<string> names)
+    {
+        var target = FindDiscordWindow();
+        if (target.Handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var root = AutomationElement.FromHandle(target.Handle);
+        if (root is null)
+        {
+            return false;
+        }
+
+        var elements = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+        for (var i = 0; i < elements.Count; i++)
+        {
+            var element = elements[i];
+            string name;
+            try
+            {
+                name = element.Current.Name ?? string.Empty;
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (!names.Any(candidate => name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            try
+            {
+                var pattern = (InvokePattern)element.GetCurrentPattern(InvokePattern.Pattern);
+                pattern.Invoke();
+                return true;
+            }
+            catch
+            {
+            }
+        }
+
+        return false;
+    }
+
+    private readonly record struct DiscordWindowTarget(bool IsRunning, IntPtr Handle, string Title);
+
+    private static DiscordWindowTarget FindDiscordWindow()
+    {
+        var processes = Process.GetProcessesByName("Discord");
+        if (processes.Length == 0)
+        {
+            return new DiscordWindowTarget(false, IntPtr.Zero, string.Empty);
+        }
+
+        try
+        {
+            var processIds = processes.Select(process => (uint)process.Id).ToHashSet();
+            var bestHandle = IntPtr.Zero;
+            var bestTitle = string.Empty;
+            var bestScore = int.MinValue;
+
+            EnumWindows((hwnd, lParam) =>
+            {
+                GetWindowThreadProcessId(hwnd, out var processId);
+                if (!processIds.Contains(processId))
+                {
+                    return true;
+                }
+
+                var className = ReadWindowClass(hwnd);
+                if (!string.Equals(className, "Chrome_WidgetWin_1", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                var title = ReadWindowTitle(hwnd);
+                var score = title.EndsWith(" - Discord", StringComparison.OrdinalIgnoreCase) ? 100_000 : 0;
+                score += title.Length;
+                if (score <= bestScore)
+                {
+                    return true;
+                }
+
+                bestScore = score;
+                bestHandle = hwnd;
+                bestTitle = title;
+                return true;
+            }, IntPtr.Zero);
+
+            return new DiscordWindowTarget(true, bestHandle, bestTitle);
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+        }
+    }
+
+    private static string ReadWindowClass(IntPtr hwnd)
+    {
+        var buffer = new StringBuilder(128);
+        return GetClassName(hwnd, buffer, buffer.Capacity) > 0 ? buffer.ToString() : string.Empty;
+    }
+
+    private static string ReadWindowTitle(IntPtr hwnd)
+    {
+        var length = Math.Clamp(GetWindowTextLength(hwnd) + 1, 2, 1024);
+        var buffer = new StringBuilder(length);
+        return GetWindowText(hwnd, buffer, buffer.Capacity) > 0 ? buffer.ToString() : string.Empty;
+    }
 
     private static bool IsDisconnectName(string name) =>
         DisconnectNames.Any(candidate => name.Equals(candidate, StringComparison.OrdinalIgnoreCase));
 
-    private static string? TryParseParticipant(string name)
-    {
-        var prefixes = new[] { "通話タイル、", "通話タイル,", "Call tile,", "Call tile、" };
-        foreach (var prefix in prefixes)
-        {
-            if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                return name[prefix.Length..].Trim();
-            }
-        }
-        return null;
-    }
+    private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
 
-    private static (string Channel, string Server) ParseWindowTitle(string title)
-    {
-        if (string.IsNullOrWhiteSpace(title))
-        {
-            return (string.Empty, string.Empty);
-        }
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
 
-        var clean = title.EndsWith(" - Discord", StringComparison.OrdinalIgnoreCase)
-            ? title[..^" - Discord".Length]
-            : title;
-        var parts = clean.Split(" | ", 2, StringSplitOptions.TrimEntries);
-        var channel = parts.Length > 0 ? CleanChannel(parts[0]) : string.Empty;
-        var server = parts.Length > 1 ? parts[1].Trim() : string.Empty;
-        return (channel, server);
-    }
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
 
-    private static string CleanChannel(string value)
-    {
-        var clean = value.Trim();
-        if (clean.StartsWith("🎤", StringComparison.Ordinal))
-        {
-            clean = clean["🎤".Length..];
-        }
-        return clean.TrimStart('｜', '|', ' ', '·').Trim();
-    }
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hwnd, StringBuilder className, int maxCount);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int maxCount);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowTextLength(IntPtr hwnd);
+
 }

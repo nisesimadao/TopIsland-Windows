@@ -10,6 +10,8 @@ public sealed record MediaSnapshot(
     string SourceApp,
     bool IsPlaying,
     double Progress,
+    TimeSpan Position,
+    TimeSpan Duration,
     byte[]? Artwork);
 
 public sealed class MediaSessionService
@@ -86,6 +88,8 @@ public sealed class MediaSessionService
                 FriendlySource(session.SourceAppUserModelId),
                 playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
                 progress,
+                timeline.Position,
+                timeline.EndTime,
                 artwork);
         }
         catch
@@ -245,7 +249,7 @@ public sealed class MediaSessionService
         _lastArtwork = null;
     }
 
-    private static MediaSnapshot Empty() => new(false, "TopIsland", "Windows top surface", string.Empty, false, 0, null);
+    private static MediaSnapshot Empty() => new(false, "TopIsland", "Windows top surface", string.Empty, false, 0, TimeSpan.Zero, TimeSpan.Zero, null);
 
     private static string FriendlySource(string source)
     {

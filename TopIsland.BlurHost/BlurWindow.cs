@@ -36,6 +36,9 @@ internal sealed class BlurWindow : IDisposable
     private DateTime _lastSettingsReadUtc;
     private DateTime _lastSettingsWriteUtc;
     private long _lastFrameTick;
+    private long _lastGeometryChangeTick;
+    private NativeRect _lastTargetRect;
+    private bool _hasLastTargetRect;
     private bool _visible;
     private bool _disposed;
 
@@ -96,7 +99,7 @@ internal sealed class BlurWindow : IDisposable
         }
 
         ReadSettingsIfNeeded(force);
-        var shouldShow = IsWindowVisible(_target) && _settings.Material is 2 or 3 or 4;
+        var shouldShow = IsWindowVisible(_target) && _settings.Material is 2 or 3;
         if (!shouldShow || !GetWindowRect(_target, out var rect))
         {
             Hide();
@@ -109,8 +112,23 @@ internal sealed class BlurWindow : IDisposable
         var scale = dpi / 96.0;
         var expanded = height / scale > 120;
 
-        var intervalMs = width > 2600 || height > 600 ? 50 : 33;
         var now = Environment.TickCount64;
+        var geometryChanged = !_hasLastTargetRect || !RectsEqual(rect, _lastTargetRect);
+        if (geometryChanged)
+        {
+            _lastTargetRect = rect;
+            _hasLastTargetRect = true;
+            _lastGeometryChangeTick = now;
+        }
+
+        // Keep the blur responsive while the shell is moving/morphing, then back
+        // off once it has settled. Foreground WPF content remains full-rate.
+        var recentlyMoving = now - _lastGeometryChangeTick < 280;
+        var intervalMs = recentlyMoving
+            ? 33
+            : width > 2600 || height > 600
+                ? 66
+                : expanded ? 50 : 33;
         if (force || now - _lastFrameTick >= intervalMs)
         {
             var options = CreateFrameOptions(_settings.Material, _settings.Theme, scale);
@@ -136,6 +154,9 @@ internal sealed class BlurWindow : IDisposable
         }
     }
 
+    private static bool RectsEqual(NativeRect left, NativeRect right) =>
+        left.Left == right.Left && left.Top == right.Top && left.Right == right.Right && left.Bottom == right.Bottom;
+
     private static BlurFrameOptions CreateFrameOptions(int material, int theme, double scale)
     {
         var light = IsLightTheme(theme);
@@ -147,7 +168,6 @@ internal sealed class BlurWindow : IDisposable
                 TintR: light ? (byte)250 : (byte)8,
                 TintG: light ? (byte)251 : (byte)9,
                 TintB: light ? (byte)253 : (byte)12),
-            4 => CreateMaterialCopyOptions(light, scale),
             _ => new BlurFrameOptions(
                 BlurSigma: (float)(19 * scale),
                 TintAlpha: light ? (byte)28 : (byte)34,
@@ -157,16 +177,6 @@ internal sealed class BlurWindow : IDisposable
         };
     }
 
-    private static BlurFrameOptions CreateMaterialCopyOptions(bool light, double scale)
-    {
-        var accent = ReadAccent();
-        return new BlurFrameOptions(
-            BlurSigma: (float)(16 * scale),
-            TintAlpha: light ? (byte)24 : (byte)30,
-            TintR: accent.R,
-            TintG: accent.G,
-            TintB: accent.B);
-    }
     private void ReadSettingsIfNeeded(bool force)
     {
         var now = DateTime.UtcNow;
@@ -225,26 +235,6 @@ internal sealed class BlurWindow : IDisposable
         {
             return false;
         }
-    }
-
-    private static (byte R, byte G, byte B) ReadAccent()
-    {
-        try
-        {
-            var value = Registry.GetValue(
-                @"HKEY_CURRENT_USER\Software\Microsoft\Windows\DWM",
-                "ColorizationColor",
-                null);
-            if (value is int i)
-            {
-                var raw = unchecked((uint)i);
-                return ((byte)(raw >> 16), (byte)(raw >> 8), (byte)raw);
-            }
-        }
-        catch
-        {
-        }
-        return (70, 110, 210);
     }
 
     private static void RegisterWindowClass()

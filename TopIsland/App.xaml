@@ -51,6 +51,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Grid Width="{TemplateBinding Width}" Height="{TemplateBinding Height}">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="20"/>
                             <Border x:Name="HoverSurface"
                                     Background="{DynamicResource ControlHoverBrush}"
                                     CornerRadius="20"
@@ -64,7 +65,11 @@
                                         <DoubleAnimation Storyboard.TargetName="HoverSurface"
                                                          Storyboard.TargetProperty="Opacity"
                                                          To="1"
-                                                         Duration="0:0:0.15"/>
+                                                         Duration="0:0:0.11">
+                                            <DoubleAnimation.EasingFunction>
+                                                <PowerEase Power="2.2" EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
                                     </Storyboard>
                                 </BeginStoryboard>
                             </EventTrigger>
@@ -74,7 +79,11 @@
                                         <DoubleAnimation Storyboard.TargetName="HoverSurface"
                                                          Storyboard.TargetProperty="Opacity"
                                                          To="0"
-                                                         Duration="0:0:0.18"/>
+                                                         Duration="0:0:0.10">
+                                            <DoubleAnimation.EasingFunction>
+                                                <PowerEase Power="2.2" EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
                                     </Storyboard>
                                 </BeginStoryboard>
                             </EventTrigger>
@@ -89,6 +98,13 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryIconButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource IconButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource PrimaryContainerBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource OnPrimaryContainerBrush}"/>
         </Style>
     </Application.Resources>
 </Application>

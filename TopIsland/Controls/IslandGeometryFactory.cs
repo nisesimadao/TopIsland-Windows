@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Media;
 using TopIsland.Models;
 
@@ -9,22 +9,28 @@ public static class IslandGeometryFactory
     public const double ShadowPadding = 16;
 
     public static Geometry Create(IslandStyle style, Size size, bool expanded)
+        => Create(style, size, expanded ? 1.0 : 0.0);
+
+    public static Geometry Create(IslandStyle style, Size size, double expandedProgress)
     {
+        var progress = Math.Clamp(expandedProgress, 0, 1);
         return style == IslandStyle.Notch
-            ? CreateNotch(size, expanded)
-            : CreateDynamicIsland(size, expanded);
+            ? CreateNotch(size, progress)
+            : CreateDynamicIsland(size, progress);
     }
 
-    private static Geometry CreateDynamicIsland(Size size, bool expanded)
+    private static Geometry CreateDynamicIsland(Size size, double progress)
     {
         var pad = ShadowPadding;
         var width = Math.Max(1, size.Width - pad * 2);
         var height = Math.Max(1, size.Height - pad * 2);
-        var radius = expanded ? Math.Min(28, height / 2.0) : height / 2.0;
+        var compactRadius = height / 2.0;
+        var expandedRadius = Math.Min(28, height / 2.0);
+        var radius = compactRadius + (expandedRadius - compactRadius) * progress;
         return new RectangleGeometry(new Rect(pad, pad, width, height), radius, radius);
     }
 
-    private static Geometry CreateNotch(Size size, bool expanded)
+    private static Geometry CreateNotch(Size size, double progress)
     {
         var pad = ShadowPadding;
         var left = pad;
@@ -35,8 +41,8 @@ public static class IslandGeometryFactory
         // BoringNotch-style geometry: the inverse shoulder is a small corner
         // radius, not a long stretched Bezier wing. These values intentionally
         // stay independent from the overall notch width.
-        var topRadius = expanded ? 19.0 : 6.0;
-        var bottomRadius = expanded ? 24.0 : 14.0;
+        var topRadius = 6.0 + (19.0 - 6.0) * progress;
+        var bottomRadius = 14.0 + (24.0 - 14.0) * progress;
         bottomRadius = Math.Min(bottomRadius, Math.Max(1, (right - left) / 4.0));
 
         var geometry = new StreamGeometry();

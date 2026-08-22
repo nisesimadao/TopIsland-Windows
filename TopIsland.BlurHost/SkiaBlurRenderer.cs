@@ -12,6 +12,7 @@ internal readonly record struct BlurFrameOptions(
 
 internal sealed class SkiaBlurRenderer : IDisposable
 {
+    private const float BlurWorkingScale = 0.50f;
     private const uint SrcCopy = 0x00CC0020;
     private const uint DibRgbColors = 0;
     private const uint BiRgb = 0;
@@ -34,6 +35,20 @@ internal sealed class SkiaBlurRenderer : IDisposable
     private int _width;
     private int _height;
     private bool _disposed;
+
+    private SKBitmap? _sourceSkia;
+    private SKBitmap? _outputSkia;
+    private SKCanvas? _outputCanvas;
+    private SKBitmap? _blurSkia;
+    private SKCanvas? _blurCanvas;
+    private SKPath? _shapePath;
+    private SKImageFilter? _blurFilter;
+    private SKPaint? _blurPaint;
+    private SKPaint? _tintPaint;
+    private int _cachedStyle = int.MinValue;
+    private bool _cachedExpanded;
+    private double _cachedScale = -1;
+    private BlurFrameOptions _cachedOptions;
 
     public SkiaBlurRenderer(IntPtr hostHwnd)
     {
@@ -72,48 +87,34 @@ internal sealed class SkiaBlurRenderer : IDisposable
                 return false;
             }
 
-            var sourceInfo = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-            var outputInfo = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
-
-            using var source = new SKBitmap();
-            using var output = new SKBitmap();
-            if (!source.InstallPixels(sourceInfo, _captureBits, width * 4) ||
-                !output.InstallPixels(outputInfo, _outputBits, width * 4))
+            EnsureSkiaResources(width, height, scale, style, expanded, options);
+            if (_sourceSkia is null || _outputCanvas is null || _blurSkia is null ||
+                _blurCanvas is null || _shapePath is null || _blurPaint is null || _tintPaint is null)
             {
                 return false;
             }
 
-            using (var canvas = new SKCanvas(output))
-            using (var shape = CreateShapePath(width, height, scale, style, expanded))
+            // Backdrop blur runs on a half-resolution working surface. A Gaussian
+            // blur discards the high-frequency detail that downsampling removes,
+            // cutting filter cost sharply without changing the apparent radius.
+            _blurCanvas.Clear(SKColors.Transparent);
+            var blurDestination = new SKRect(0, 0, _blurSkia.Width, _blurSkia.Height);
+            _blurCanvas.DrawBitmap(_sourceSkia, blurDestination, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None), _blurPaint);
+            _blurCanvas.Flush();
+
+            _outputCanvas.Clear(SKColors.Transparent);
+            _outputCanvas.Save();
+            _outputCanvas.ClipPath(_shapePath, SKClipOperation.Intersect, antialias: true);
+            var outputDestination = new SKRect(0, 0, width, height);
+            _outputCanvas.DrawBitmap(_blurSkia, outputDestination, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
+
+            if (options.TintAlpha > 0)
             {
-                canvas.Clear(SKColors.Transparent);
-                canvas.Save();
-                canvas.ClipPath(shape, SKClipOperation.Intersect, antialias: true);
-
-                using var blur = SKImageFilter.CreateBlur(
-                    Math.Max(0.1f, options.BlurSigma),
-                    Math.Max(0.1f, options.BlurSigma),
-                    SKShaderTileMode.Clamp);
-                using var blurPaint = new SKPaint
-                {
-                    IsAntialias = true,
-                    ImageFilter = blur
-                };
-                canvas.DrawBitmap(source, 0, 0, SKSamplingOptions.Default, blurPaint);
-
-                if (options.TintAlpha > 0)
-                {
-                    using var tintPaint = new SKPaint
-                    {
-                        IsAntialias = true,
-                        Color = new SKColor(options.TintR, options.TintG, options.TintB, options.TintAlpha)
-                    };
-                    canvas.DrawRect(0, 0, width, height, tintPaint);
-                }
-
-                canvas.Restore();
-                canvas.Flush();
+                _outputCanvas.DrawRect(0, 0, width, height, _tintPaint);
             }
+
+            _outputCanvas.Restore();
+            _outputCanvas.Flush();
 
             var dst = new NativePoint(screenX, screenY);
             var size = new NativeSize(width, height);
@@ -141,6 +142,60 @@ internal sealed class SkiaBlurRenderer : IDisposable
         {
             ReleaseDC(IntPtr.Zero, screenDc);
         }
+    }
+
+    private void EnsureSkiaResources(
+        int width,
+        int height,
+        double scale,
+        int style,
+        bool expanded,
+        BlurFrameOptions options)
+    {
+        if (_sourceSkia is null || _outputSkia is null || _blurSkia is null || _outputCanvas is null || _blurCanvas is null)
+        {
+            _sourceSkia = new SKBitmap();
+            _outputSkia = new SKBitmap();
+            var sourceInfo = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque);
+            var outputInfo = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
+            if (!_sourceSkia.InstallPixels(sourceInfo, _captureBits, width * 4) ||
+                !_outputSkia.InstallPixels(outputInfo, _outputBits, width * 4))
+            {
+                throw new InvalidOperationException("Could not attach Skia bitmaps to blur buffers.");
+            }
+
+            var blurWidth = Math.Max(1, (int)Math.Ceiling(width * BlurWorkingScale));
+            var blurHeight = Math.Max(1, (int)Math.Ceiling(height * BlurWorkingScale));
+            _blurSkia = new SKBitmap(new SKImageInfo(blurWidth, blurHeight, SKColorType.Bgra8888, SKAlphaType.Premul));
+            _outputCanvas = new SKCanvas(_outputSkia);
+            _blurCanvas = new SKCanvas(_blurSkia);
+        }
+
+        if (_shapePath is null || _cachedStyle != style || _cachedExpanded != expanded || Math.Abs(_cachedScale - scale) > 0.001)
+        {
+            _shapePath?.Dispose();
+            _shapePath = CreateShapePath(width, height, scale, style, expanded);
+            _cachedStyle = style;
+            _cachedExpanded = expanded;
+            _cachedScale = scale;
+        }
+
+        if (_blurPaint is null || !_cachedOptions.Equals(options))
+        {
+            _blurPaint?.Dispose();
+            _blurFilter?.Dispose();
+            var workingSigma = Math.Max(0.1f, options.BlurSigma * BlurWorkingScale);
+            _blurFilter = SKImageFilter.CreateBlur(workingSigma, workingSigma, SKShaderTileMode.Clamp);
+            _blurPaint = new SKPaint
+            {
+                IsAntialias = true,
+                ImageFilter = _blurFilter
+            };
+            _cachedOptions = options;
+        }
+
+        _tintPaint ??= new SKPaint { IsAntialias = true };
+        _tintPaint.Color = new SKColor(options.TintR, options.TintG, options.TintB, options.TintAlpha);
     }
 
     private static SKPath CreateShapePath(int width, int height, double scale, int style, bool expanded)
@@ -248,6 +303,8 @@ internal sealed class SkiaBlurRenderer : IDisposable
 
     private void ReleaseBuffers()
     {
+        ReleaseSkiaResources();
+
         if (_captureDc != IntPtr.Zero && _captureOld != IntPtr.Zero)
         {
             SelectObject(_captureDc, _captureOld);
@@ -264,6 +321,33 @@ internal sealed class SkiaBlurRenderer : IDisposable
         _captureDc = _captureBitmap = _captureOld = _captureBits = IntPtr.Zero;
         _outputDc = _outputBitmap = _outputOld = _outputBits = IntPtr.Zero;
         _width = _height = 0;
+    }
+
+    private void ReleaseSkiaResources()
+    {
+        _outputCanvas?.Dispose();
+        _blurCanvas?.Dispose();
+        _sourceSkia?.Dispose();
+        _outputSkia?.Dispose();
+        _blurSkia?.Dispose();
+        _shapePath?.Dispose();
+        _blurPaint?.Dispose();
+        _blurFilter?.Dispose();
+        _tintPaint?.Dispose();
+
+        _outputCanvas = null;
+        _blurCanvas = null;
+        _sourceSkia = null;
+        _outputSkia = null;
+        _blurSkia = null;
+        _shapePath = null;
+        _blurPaint = null;
+        _blurFilter = null;
+        _tintPaint = null;
+        _cachedStyle = int.MinValue;
+        _cachedExpanded = false;
+        _cachedScale = -1;
+        _cachedOptions = default;
     }
 
     public void Dispose()

@@ -1,4 +1,4 @@
-﻿using Material3.Core;
+using Material3.Core;
 using System.Windows.Media;
 
 namespace TopIsland.Services;
@@ -46,8 +46,8 @@ public sealed class MaterialYouThemeService
             PrimaryText: onSurface,
             SecondaryText: onSurfaceVariant,
             TertiaryText: WithAlpha(outline, 220),
-            Border: WithAlpha(outlineVariant, 210),
-            Divider: WithAlpha(outlineVariant, 150),
+            Border: WithAlpha(outlineVariant, light ? (byte)110 : (byte)90),
+            Divider: WithAlpha(outlineVariant, light ? (byte)125 : (byte)110),
             ControlHover: WithAlpha(onSurface, 20),
             ControlPressed: WithAlpha(onSurface, 31),
             Primary: ToColor(scheme.Primary),
