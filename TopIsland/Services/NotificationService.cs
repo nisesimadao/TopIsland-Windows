@@ -1,9 +1,10 @@
+using Windows.Storage.Streams;
 using Windows.UI.Notifications;
 using Windows.UI.Notifications.Management;
 
 namespace TopIsland.Services;
 
-public sealed record NotificationItemSnapshot(string AppName, string Text, DateTimeOffset CreatedAt);
+public sealed record NotificationItemSnapshot(string AppName, string Text, DateTimeOffset CreatedAt, byte[]? IconPng);
 public sealed record NotificationSnapshot(bool AccessAllowed, IReadOnlyList<NotificationItemSnapshot> Items)
 {
     public int Count => Items.Count;
@@ -15,6 +16,7 @@ public sealed record NotificationSnapshot(bool AccessAllowed, IReadOnlyList<Noti
 public sealed class NotificationService
 {
     private readonly UserNotificationListener _listener = UserNotificationListener.Current;
+    private readonly Dictionary<string, byte[]?> _logoCache = new(StringComparer.Ordinal);
 
     public bool IsAccessAllowed()
     {
@@ -48,21 +50,69 @@ public sealed class NotificationService
         try
         {
             var notifications = await _listener.GetNotificationsAsync(NotificationKinds.Toast);
-            var items = notifications
+            var items = new List<NotificationItemSnapshot>(3);
+            foreach (var notification in notifications
                 .OrderByDescending(notification => notification.CreationTime)
-                .Take(3)
-                .Select(notification =>
+                .Take(3))
+            {
+                var appName = notification.AppInfo?.DisplayInfo?.DisplayName ?? "Notification";
+                var binding = notification.Notification.Visual.GetBinding(KnownNotificationBindings.ToastGeneric);
+                var text = binding?.GetTextElements()
+                    .Select(element => element.Text)
+                    .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+
+                if (!_logoCache.TryGetValue(appName, out var iconPng))
                 {
-                    var appName = notification.AppInfo?.DisplayInfo?.DisplayName ?? "Notification";
-                    var binding = notification.Notification.Visual.GetBinding(KnownNotificationBindings.ToastGeneric);
-                    var text = binding?.GetTextElements()
-                        .Select(element => element.Text)
-                        .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
-                    return new NotificationItemSnapshot(appName, text, notification.CreationTime);
-                })
-                .ToArray();
+                    var logo = notification.AppInfo?.DisplayInfo?.GetLogo(new Windows.Foundation.Size(24, 24));
+                    iconPng = await ReadLogoAsync(logo);
+                    if (_logoCache.Count >= 32)
+                    {
+                        _logoCache.Clear();
+                    }
+                    _logoCache[appName] = iconPng;
+                }
+
+                items.Add(new NotificationItemSnapshot(appName, text, notification.CreationTime, iconPng));
+            }
             return new NotificationSnapshot(true, items);
         }
-        catch { return new NotificationSnapshot(false, Array.Empty<NotificationItemSnapshot>()); }
+        catch
+        {
+            return new NotificationSnapshot(false, Array.Empty<NotificationItemSnapshot>());
+        }
+    }
+
+    private static async Task<byte[]?> ReadLogoAsync(IRandomAccessStreamReference? reference)
+    {
+        if (reference is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            using var stream = await reference.OpenReadAsync();
+            var requested = (uint)Math.Min(stream.Size, 256_000UL);
+            if (requested == 0)
+            {
+                return null;
+            }
+
+            using var reader = new DataReader(stream);
+            var loaded = await reader.LoadAsync(requested);
+            if (loaded == 0)
+            {
+                return null;
+            }
+
+            var bytes = new byte[loaded];
+            reader.ReadBytes(bytes);
+            reader.DetachStream();
+            return bytes;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

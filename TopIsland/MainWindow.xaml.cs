@@ -50,6 +50,7 @@ public partial class MainWindow : Window
     private OverlayWindowBehavior? _overlayBehavior;
     private BackdropApplyResult _backdropResult = new(false, false, "Unavailable");
     private byte[]? _lastArtworkBytes;
+    private bool? _lastArtworkIsMedia;
     private MonitorDescriptor? _currentMonitor;
     private IntPtr _hwnd;
     private double _targetTopDip;

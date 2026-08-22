@@ -98,6 +98,9 @@ public partial class MainWindow
             NotificationAge1Text.Text = string.Empty;
             NotificationAge2Text.Text = string.Empty;
             NotificationAge3Text.Text = string.Empty;
+            ApplyNotificationIcon(NotificationIcon1, NotificationIconBorder1, null);
+            ApplyNotificationIcon(NotificationIcon2, NotificationIconBorder2, null);
+            ApplyNotificationIcon(NotificationIcon3, NotificationIconBorder3, null);
 
             if (!snapshot.AccessAllowed)
             {
@@ -115,22 +118,28 @@ public partial class MainWindow
 
             var first = snapshot.Items[0];
             NotificationPrimaryText.Text = first.AppName;
+            NotificationIconFallback1.Text = NotificationInitial(first.AppName);
             NotificationDetailText.Text = first.Text;
             NotificationAge1Text.Text = FormatNotificationAge(first.CreatedAt);
+            ApplyNotificationIcon(NotificationIcon1, NotificationIconBorder1, first.IconPng);
 
             if (snapshot.Items.Count > 1)
             {
                 var second = snapshot.Items[1];
+                NotificationIconFallback2.Text = NotificationInitial(second.AppName);
                 NotificationItem2Group.Visibility = Visibility.Visible;
                 NotificationPrimary2Text.Text = $"{second.AppName} \u00B7 {second.Text}";
                 NotificationAge2Text.Text = FormatNotificationAge(second.CreatedAt);
+                ApplyNotificationIcon(NotificationIcon2, NotificationIconBorder2, second.IconPng);
             }
             if (snapshot.Items.Count > 2)
             {
                 var third = snapshot.Items[2];
+                NotificationIconFallback3.Text = NotificationInitial(third.AppName);
                 NotificationItem3Group.Visibility = Visibility.Visible;
                 NotificationPrimary3Text.Text = $"{third.AppName} \u00B7 {third.Text}";
                 NotificationAge3Text.Text = FormatNotificationAge(third.CreatedAt);
+                ApplyNotificationIcon(NotificationIcon3, NotificationIconBorder3, third.IconPng);
             }
         }
         finally
@@ -139,6 +148,50 @@ public partial class MainWindow
         }
     }
 
+    private static void ApplyNotificationIcon(System.Windows.Controls.Image image, FrameworkElement container, byte[]? bytes)
+    {
+        image.Source = null;
+        container.Visibility = Visibility.Visible;
+        var fallback = (image.Parent as System.Windows.Controls.Grid)?.Children
+            .OfType<System.Windows.Controls.TextBlock>()
+            .FirstOrDefault();
+        if (fallback is not null)
+        {
+            fallback.Visibility = Visibility.Visible;
+        }
+
+        if (bytes is not { Length: > 0 })
+        {
+            return;
+        }
+
+        try
+        {
+            using var stream = new MemoryStream(bytes);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.StreamSource = stream;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            image.Source = bitmap;
+            if (fallback is not null)
+            {
+                fallback.Visibility = Visibility.Collapsed;
+            }
+        }
+        catch
+        {
+            // Keep the initial badge when a package logo cannot be decoded.
+        }
+    }
+    private static string NotificationInitial(string appName)
+    {
+        var trimmed = appName?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed)
+            ? "N"
+            : StringInfo.GetNextTextElement(trimmed).ToUpperInvariant();
+    }
     private static string FormatNotificationAge(DateTimeOffset createdAt)
     {
         var age = DateTimeOffset.Now - createdAt;
@@ -372,12 +425,13 @@ public partial class MainWindow
 
     private void ApplyArtwork(byte[]? bytes, bool isMedia)
     {
-        if (ReferenceEquals(_lastArtworkBytes, bytes))
+        if (ReferenceEquals(_lastArtworkBytes, bytes) && _lastArtworkIsMedia == isMedia)
         {
             return;
         }
 
         _lastArtworkBytes = bytes;
+        _lastArtworkIsMedia = isMedia;
         if (bytes is { Length: > 0 })
         {
             try
@@ -592,6 +646,13 @@ public partial class MainWindow
         var focus = _focusTimerService.Snapshot();
         FocusTimerLabelText.Text = focus.Duration >= TimeSpan.FromMinutes(40) ? "Break" : "Focus";
         FocusTimerText.Text = focus.Display;
+        var focusProgress = focus.Duration.TotalMilliseconds > 0
+            ? Math.Clamp(1 - focus.Remaining.TotalMilliseconds / focus.Duration.TotalMilliseconds, 0, 1)
+            : 0;
+        FocusTimerProgressBar.Value = focusProgress;
+        FocusTimerProgressBar.Visibility = focus.IsRunning || focusProgress > 0.001
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         _focusIsRunning = focus.IsRunning;
         CompactFocusText.Text = $"Focus {focus.Display}";
         CompactFocusPlayIconViewbox.Visibility = focus.IsRunning ? Visibility.Collapsed : Visibility.Visible;

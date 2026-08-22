@@ -316,10 +316,25 @@
                             <TextBlock Text="NOTIFICATIONS" FontSize="8.5" Foreground="{DynamicResource TertiaryTextBrush}"/>
                             <Button Grid.Column="1" Content="Clear all" FontSize="8" Foreground="{DynamicResource AccentBrush}" Background="Transparent" BorderThickness="0" Padding="4,1" Cursor="Hand" Click="ClearNotificationsButton_Click"/>
                         </Grid>
-                        <Grid x:Name="NotificationItem1Group"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="NotificationPrimaryText" Text="No notifications" FontSize="10.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="NotificationAge1Text" Grid.Column="1" FontSize="8" Foreground="{DynamicResource TertiaryTextBrush}" Margin="7,0,0,0"/></Grid>
-                        <TextBlock x:Name="NotificationDetailText" FontSize="8.5" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" Margin="0,1,0,5"/>
-                        <Grid x:Name="NotificationItem2Group" Visibility="Collapsed" Margin="0,0,0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="NotificationPrimary2Text" FontSize="9" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="NotificationAge2Text" Grid.Column="1" FontSize="8" Foreground="{DynamicResource TertiaryTextBrush}" Margin="7,0,0,0"/></Grid>
-                        <Grid x:Name="NotificationItem3Group" Visibility="Collapsed"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="NotificationPrimary3Text" FontSize="9" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="NotificationAge3Text" Grid.Column="1" FontSize="8" Foreground="{DynamicResource TertiaryTextBrush}" Margin="7,0,0,0"/></Grid>
+                        <Grid x:Name="NotificationItem1Group">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Border x:Name="NotificationIconBorder1" Grid.Column="0" Width="16" Height="16" CornerRadius="4" Background="#14FFFFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,0,4,0"><Grid><Image x:Name="NotificationIcon1" Stretch="UniformToFill"/><TextBlock x:Name="NotificationIconFallback1" Text="N" FontSize="8" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid></Border>
+                            <TextBlock x:Name="NotificationPrimaryText" Grid.Column="1" Text="No notifications" FontSize="10.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="NotificationAge1Text" Grid.Column="2" FontSize="8" Foreground="{DynamicResource TertiaryTextBrush}" Margin="7,0,0,0"/>
+                        </Grid>
+                        <TextBlock x:Name="NotificationDetailText" FontSize="8.5" Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis" Margin="20,1,0,5"/>
+                        <Grid x:Name="NotificationItem2Group" Visibility="Collapsed" Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Border x:Name="NotificationIconBorder2" Grid.Column="0" Width="15" Height="15" CornerRadius="4" Background="#14FFFFFF" HorizontalAlignment="Left" Margin="0,0,4,0"><Grid><Image x:Name="NotificationIcon2" Stretch="UniformToFill"/><TextBlock x:Name="NotificationIconFallback2" Text="N" FontSize="7.5" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid></Border>
+                            <TextBlock x:Name="NotificationPrimary2Text" Grid.Column="1" FontSize="9" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="NotificationAge2Text" Grid.Column="2" FontSize="8" Foreground="{DynamicResource TertiaryTextBrush}" Margin="7,0,0,0"/>
+                        </Grid>
+                        <Grid x:Name="NotificationItem3Group" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Border x:Name="NotificationIconBorder3" Grid.Column="0" Width="15" Height="15" CornerRadius="4" Background="#14FFFFFF" HorizontalAlignment="Left" Margin="0,0,4,0"><Grid><Image x:Name="NotificationIcon3" Stretch="UniformToFill"/><TextBlock x:Name="NotificationIconFallback3" Text="N" FontSize="7.5" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid></Border>
+                            <TextBlock x:Name="NotificationPrimary3Text" Grid.Column="1" FontSize="9" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="NotificationAge3Text" Grid.Column="2" FontSize="8" Foreground="{DynamicResource TertiaryTextBrush}" Margin="7,0,0,0"/>
+                        </Grid>
                     </StackPanel>
                 </Grid>
 
@@ -336,10 +351,11 @@
 
                     <!-- Timers -->
                     <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <TextBlock Text="TIMERS" FontSize="8.5" Foreground="{DynamicResource TertiaryTextBrush}" Margin="0,0,0,5"/>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="TIMERS" FontSize="8.5" Foreground="{DynamicResource TertiaryTextBrush}" Margin="0,0,0,4"/>
                         <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="FocusTimerLabelText" Text="Focus" FontSize="10"/><TextBlock x:Name="FocusTimerText" Grid.Column="1" Text="25:00" FontSize="10.5" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" Margin="8,0"/><Button x:Name="FocusToggleButton" Grid.Column="2" Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Click="FocusToggleButton_Click" AutomationProperties.Name="Toggle focus timer"><Grid Width="11" Height="11"><Viewbox x:Name="FocusPlayIconViewbox" Width="11" Height="11"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox><Viewbox x:Name="FocusPauseIconViewbox" Width="11" Height="11" Visibility="Collapsed"><Path Data="{StaticResource PauseGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Grid></Button></Grid>
-                        <Grid Grid.Row="2" Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Break" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}"/><TextBlock Text="45:00" Grid.Column="1" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" Typography.NumeralAlignment="Tabular" Margin="8,0"/><Button Grid.Column="2" Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Click="Break45Button_Click"><Viewbox Width="11" Height="11"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource SecondaryTextBrush}"/></Viewbox></Button></Grid>
+                        <ProgressBar x:Name="FocusTimerProgressBar" Grid.Row="2" Style="{StaticResource MediaProgressStyle}" Minimum="0" Maximum="1" Value="0" Height="3" Margin="0,1,30,2" Visibility="Collapsed" IsHitTestVisible="False"/>
+                        <Grid Grid.Row="3" Margin="0,1,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Break" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}"/><TextBlock Text="45:00" Grid.Column="1" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" Typography.NumeralAlignment="Tabular" Margin="8,0"/><Button Grid.Column="2" Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Click="Break45Button_Click"><Viewbox Width="11" Height="11"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource SecondaryTextBrush}"/></Viewbox></Button></Grid>
                     </Grid>
 
                     <Border x:Name="DownloadLeadingSeparator" Grid.Column="1" Width="1" Background="{DynamicResource DividerBrush}" Margin="0,3"/>
