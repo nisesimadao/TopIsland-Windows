@@ -592,6 +592,10 @@ public partial class MainWindow
         var focus = _focusTimerService.Snapshot();
         FocusTimerLabelText.Text = focus.Duration >= TimeSpan.FromMinutes(40) ? "Break" : "Focus";
         FocusTimerText.Text = focus.Display;
+        _focusIsRunning = focus.IsRunning;
+        CompactFocusText.Text = $"Focus {focus.Display}";
+        CompactFocusPlayIconViewbox.Visibility = focus.IsRunning ? Visibility.Collapsed : Visibility.Visible;
+        CompactFocusPauseIconViewbox.Visibility = focus.IsRunning ? Visibility.Visible : Visibility.Collapsed;
         FullFocusText.Text = focus.Display;
         FocusPlayIconViewbox.Visibility = focus.IsRunning ? Visibility.Collapsed : Visibility.Visible;
         FocusPauseIconViewbox.Visibility = focus.IsRunning ? Visibility.Visible : Visibility.Collapsed;

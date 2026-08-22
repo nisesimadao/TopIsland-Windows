@@ -247,6 +247,18 @@ public partial class MainWindow
         ApplyState();
     }
 
+    private void FullSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (Root.ContextMenu is null)
+        {
+            return;
+        }
+
+        Root.ContextMenu.PlacementTarget = FullSettingsButton;
+        Root.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        Root.ContextMenu.IsOpen = true;
+    }
     private void ExitButton_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
 
     private void SaveAndRefresh()
@@ -303,15 +315,19 @@ public partial class MainWindow
         CompactRamMeter.Visibility = showCompactMeters ? Visibility.Visible : Visibility.Collapsed;
 
         FullWidthInfoPanel.Visibility = baseWidth >= 1400 ? Visibility.Visible : Visibility.Collapsed;
+        FullSettingsButton.Visibility = baseWidth >= 1400 ? Visibility.Visible : Visibility.Collapsed;
 
         var showIndicators = baseWidth >= 520 || (peek && baseWidth >= 420);
         CompactIndicatorsPanel.Visibility = showIndicators ? Visibility.Visible : Visibility.Collapsed;
         CompactNotificationIndicator.Visibility = showIndicators && _notificationCount > 0 ? Visibility.Visible : Visibility.Collapsed;
         CompactDownloadIndicator.Visibility = showIndicators && _activeDownloadCount > 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        CompactActivityText.Visibility = hoverOrPeek
+        var showContextualActivity = baseWidth < 1400 && hoverOrPeek && (baseWidth >= 520 || (peek && baseWidth >= 480));
+        var showFocusControl = showContextualActivity && _focusIsRunning;
+        CompactFocusGroup.Visibility = showFocusControl ? Visibility.Visible : Visibility.Collapsed;
+        CompactActivityText.Visibility = showContextualActivity
+            && !showFocusControl
             && !string.IsNullOrWhiteSpace(CompactActivityText.Text)
-            && (baseWidth >= 520 || (peek && baseWidth >= 480))
             ? Visibility.Visible
             : Visibility.Collapsed;
     }

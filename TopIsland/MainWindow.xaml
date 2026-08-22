@@ -29,6 +29,7 @@
         <Geometry x:Key="ChatGeometry">M2,3 H18 V14 H9 L5,18 V14 H2 Z M5,6 H15 V7.5 H5 Z M5,9 H13 V10.5 H5 Z</Geometry>
         <Geometry x:Key="BellGeometry">M10,2 C7.8,2 6,3.8 6,6 V9 C6,10.8 5.2,12.1 4,13 H16 C14.8,12.1 14,10.8 14,9 V6 C14,3.8 12.2,2 10,2 Z M8,15 H12 C11.6,16.2 10.9,17 10,17 C9.1,17 8.4,16.2 8,15 Z</Geometry>
         <Geometry x:Key="DownloadGeometry">M9,2 H11 V10 L14,7 L15.4,8.4 L10,13.8 L4.6,8.4 L6,7 L9,10 Z M3,15 H17 V17 H3 Z</Geometry>
+        <Geometry x:Key="SettingsGeometry">M12,2.5 L13.1,5.1 C13.7,5.3 14.3,5.6 14.8,6 L17.5,5 L19,7.6 L16.9,9.4 C17,9.9 17.1,10.5 17.1,11 C17.1,11.5 17,12.1 16.9,12.6 L19,14.4 L17.5,17 L14.8,16 C14.3,16.4 13.7,16.7 13.1,16.9 L12,19.5 H9 L7.9,16.9 C7.3,16.7 6.7,16.4 6.2,16 L3.5,17 L2,14.4 L4.1,12.6 C4,12.1 3.9,11.5 3.9,11 C3.9,10.5 4,9.9 4.1,9.4 L2,7.6 L3.5,5 L6.2,6 C6.7,5.6 7.3,5.3 7.9,5.1 L9,2.5 Z M10.5,8 A3,3 0 1 0 10.5,14 A3,3 0 0 0 10.5,8 Z</Geometry>
         <Style x:Key="MediaSeekStyle" TargetType="Slider">
             <Setter Property="Height" Value="12"/>
             <Setter Property="Minimum" Value="0"/>
@@ -202,7 +203,14 @@
                             <TextBlock x:Name="CompactDownloadText" Text="0" FontSize="8.5" Foreground="{DynamicResource SecondaryTextBrush}" Margin="3,0,0,0"/>
                         </StackPanel>
                     </StackPanel>
+                                        <StackPanel x:Name="CompactFocusGroup" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed" Margin="10,0,0,0">
+                        <TextBlock x:Name="CompactFocusText" Text="Focus 25:00" FontSize="9" Foreground="{DynamicResource SecondaryTextBrush}" Typography.NumeralAlignment="Tabular" VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Margin="4,0,0,0" Click="FocusToggleButton_Click" ToolTip="Pause / resume focus timer" AutomationProperties.Name="Toggle focus timer">
+                            <Grid Width="10" Height="10"><Viewbox x:Name="CompactFocusPlayIconViewbox" Width="10" Height="10" Visibility="Collapsed"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox><Viewbox x:Name="CompactFocusPauseIconViewbox" Width="10" Height="10"><Path Data="{StaticResource PauseGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Grid>
+                        </Button>
+                    </StackPanel>
                     <TextBlock x:Name="CompactActivityText" Text="Focus 25:00" FontSize="9" Foreground="{DynamicResource TertiaryTextBrush}" Typography.NumeralAlignment="Tabular" VerticalAlignment="Center" Visibility="Collapsed" Margin="10,0,0,0"/>
+                    <Button x:Name="FullSettingsButton" Style="{StaticResource IconButtonStyle}" Width="28" Height="28" Margin="8,0,0,0" Visibility="Collapsed" Click="FullSettingsButton_Click" ToolTip="TopIsland settings" AutomationProperties.Name="TopIsland settings"><Viewbox Width="13" Height="13"><Path Data="{StaticResource SettingsGeometry}" Fill="{DynamicResource SecondaryTextBrush}"/></Viewbox></Button>
                 </StackPanel>
             </Grid>
 
@@ -330,7 +338,7 @@
                     <Grid Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="TIMERS" FontSize="8.5" Foreground="{DynamicResource TertiaryTextBrush}" Margin="0,0,0,5"/>
-                        <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="FocusTimerLabelText" Text="Focus" FontSize="10"/><TextBlock x:Name="FocusTimerText" Grid.Column="1" Text="25:00" FontSize="10.5" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" Margin="8,0"/><Button x:Name="FocusToggleButton" Grid.Column="2" Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Click="FocusToggleButton_Click"><Grid Width="11" Height="11"><Viewbox x:Name="FocusPlayIconViewbox" Width="11" Height="11"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox><Viewbox x:Name="FocusPauseIconViewbox" Width="11" Height="11" Visibility="Collapsed"><Path Data="{StaticResource PauseGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Grid></Button></Grid>
+                        <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock x:Name="FocusTimerLabelText" Text="Focus" FontSize="10"/><TextBlock x:Name="FocusTimerText" Grid.Column="1" Text="25:00" FontSize="10.5" FontWeight="SemiBold" Typography.NumeralAlignment="Tabular" Margin="8,0"/><Button x:Name="FocusToggleButton" Grid.Column="2" Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Click="FocusToggleButton_Click" AutomationProperties.Name="Toggle focus timer"><Grid Width="11" Height="11"><Viewbox x:Name="FocusPlayIconViewbox" Width="11" Height="11"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox><Viewbox x:Name="FocusPauseIconViewbox" Width="11" Height="11" Visibility="Collapsed"><Path Data="{StaticResource PauseGeometry}" Fill="{DynamicResource PrimaryTextBrush}"/></Viewbox></Grid></Button></Grid>
                         <Grid Grid.Row="2" Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Break" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}"/><TextBlock Text="45:00" Grid.Column="1" FontSize="10" Foreground="{DynamicResource SecondaryTextBrush}" Typography.NumeralAlignment="Tabular" Margin="8,0"/><Button Grid.Column="2" Style="{StaticResource IconButtonStyle}" Width="24" Height="24" Click="Break45Button_Click"><Viewbox Width="11" Height="11"><Path Data="{StaticResource PlayGeometry}" Fill="{DynamicResource SecondaryTextBrush}"/></Viewbox></Button></Grid>
                     </Grid>
 

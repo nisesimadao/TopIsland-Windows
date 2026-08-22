@@ -56,6 +56,7 @@ public partial class MainWindow : Window
     private int _notificationCount;
     private int _activeDownloadCount;
     private bool _hasMediaSession;
+    private bool _focusIsRunning;
     private long _monitorTransitionSerial;
     private bool _externalBlurAvailable;
     private bool _windowTransitionActive;
