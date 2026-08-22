@@ -42,6 +42,7 @@ internal sealed class BlurWindow : IDisposable
     private bool _hasLastTargetRect;
     private bool _visible;
     private bool _disposed;
+    private bool _highResolutionTimerActive;
 
     public BlurWindow(IntPtr target)
     {
@@ -70,7 +71,8 @@ internal sealed class BlurWindow : IDisposable
 
         Instances[_hwnd] = this;
         _renderer = new SkiaBlurRenderer(_hwnd);
-        SetTimer(_hwnd, new UIntPtr(1), 16, IntPtr.Zero);
+        _highResolutionTimerActive = TimeBeginPeriod(1) == 0;
+        SetTimer(_hwnd, new UIntPtr(1), 4, IntPtr.Zero);
         Update(force: true);
     }
 
@@ -125,11 +127,14 @@ internal sealed class BlurWindow : IDisposable
             _lastGeometryChangeTick = now;
         }
 
-        // Keep the blur responsive while the shell is moving/morphing, then back
-        // off once it has settled. Foreground WPF content remains full-rate.
+        // Match the foreground surface at ~60 Hz while the shell is moving or
+        // revealing. The previous 33 ms cap made glass/acrylic visibly update at
+        // half the rate of the WPF animation even when the foreground itself was
+        // rendering smoothly. Once the shell settles, back off to save GPU/CPU.
         var recentlyMoving = now - _lastGeometryChangeTick < 280;
-        var intervalMs = recentlyMoving
-            ? 33
+        var revealInMotion = revealProgress > 0.001 && revealProgress < 0.999;
+        var intervalMs = recentlyMoving || revealInMotion
+            ? 4
             : width > 2600 || height > 600
                 ? 66
                 : expanded ? 50 : 33;
@@ -303,6 +308,11 @@ internal sealed class BlurWindow : IDisposable
             KillTimer(_hwnd, new UIntPtr(1));
             DestroyWindow(_hwnd);
         }
+        if (_highResolutionTimerActive)
+        {
+            _ = TimeEndPeriod(1);
+            _highResolutionTimerActive = false;
+        }
     }
 
     private sealed class BlurSettings
@@ -360,6 +370,10 @@ internal sealed class BlurWindow : IDisposable
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr GetModuleHandle(string? lpModuleName);
+    [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
+    private static extern uint TimeBeginPeriod(uint period);
+    [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
+    private static extern uint TimeEndPeriod(uint period);
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern ushort RegisterClassEx(ref WndClassEx lpwcx);
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
