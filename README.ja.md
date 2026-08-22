@@ -28,15 +28,15 @@ TopIslandは、Windowsの画面上部中央に常駐し、必要なときだけ�
 
 現在は次の情報を実際のWindows/アプリから取得しています。
 
-- Windows GMTCのメディア情報、アートワーク、再生位置、Previous / Play-Pause / Next
-- メディアがない場合の前面アプリ名、プロセス、実行ファイルアイコン
+- Windows GMTCのメディア情報、アートワーク、再生位置、実操作できるSeek、Previous / Play-Pause / Next
+- 前面アプリ名、プロセス、実行ファイルアイコン。ExpandedではDownloadがない時にSESSIONとして実メモリ、スレッド数、プロセス起動時間も表示
 - **CPU / GPU / RAM**
 - **Discord VC** — Discord Desktopの表示中/トレイ格納中Electron windowからVC名、サーバー、参加人数、自分のMute/Deafen状態をWindows UI Automationで読み取り、Discord側がUIA操作を公開している場合はMute / Deafen / Leaveも実操作します
 - NetworkのDownload / Upload速度
 - システムドライブの空き容量 / 総容量
 - `.crdownload` / `.part`など実際に進行しているDownloadと実測転送速度
 - 25分 / 45分の**Focus Timer**、Pause / Resume / Reset
-- 許可済みの場合のみWindows通知の件数、アプリ名、最新テキスト
+- 許可済みの場合のみWindows通知の件数、アプリ名、最新テキストと、本当に通知を消すClear all
 - Battery搭載機のみ残量 / 充電状態
 - 時刻 / 日付
 
@@ -44,12 +44,12 @@ Windows通知の権限は起動時に勝手に要求しません。許可がな�
 
 ## 表示状態
 
-- **Idle** — 選択中の幅に必要な最小情報
+- **Idle** — Media/Active App、時計、幅に余裕があれば上へ見切れたタコメーター型CPU/RAMアークと通知/Downloadインジケータ
 - **Hover** — わずかに広く・深くなる
 - **Peek** — Full Expandせず、優先度の低い情報を少し追加
-- **Expanded** — Context/Now PlayingとSystemを軸に、**実際に動いているDownload**と**接続中Discord VC**だけを必要時に追加。下段はTimers / Storage / optional Notifications / Batteryを細いdividerで区切ります
+- **Expanded** — 上段は Context / Now Playing、中央の大きな時計＋CPU/GPU/RAM＋Power/温度＋Discord VC操作、通知がある時だけNotifications。下段はTimers、通常時はSESSION、Download中だけDOWNLOADSへ置換、右にStorage / Network / Hardwareです
 
-幅が狭い場合は文字を無理に縮めず、優先度の低い項目を消します。空モジュールは場所を取りません。Downloadsはpartial fileが実際に更新されている間だけ、DiscordはVC接続中だけ表示します。Full WidthではNetwork / Storage / Activityなどを追加できますが、Media本文やProgressBarそのものを画面幅まで引き伸ばしません。
+幅が狭い場合は文字を無理に縮めず、優先度の低い情報を落とします。空モジュールは場所を取りません。Downloadsはpartial fileが実際に更新中の時だけ表示し、それ以外は同じ中央レーンをSESSION（前面プロセスのメモリ/スレッド/起動時間）として使います。Discord操作はVC接続中だけ、Notificationsは存在する時だけ表示します。Full Widthでは余った中央をFocus / Voice / Downloads / Network / Storageに使い、Media本文を横へ引き伸ばしません。
 
 ## Screenshots
 

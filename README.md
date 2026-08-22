@@ -28,15 +28,15 @@ The reference appearance is intentionally restrained: **one surface, real data, 
 
 TopIsland currently uses real Windows/application data for:
 
-- Windows GMTC media title, source, artwork, playback position and Previous / Play-Pause / Next
-- Foreground application title, process and executable icon when there is no active media session
+- Windows GMTC media title, source, artwork, playback position, interactive seek and Previous / Play-Pause / Next
+- Foreground application title, process and executable icon; Expanded also shows live foreground-process memory, thread count and process uptime in the SESSION lane when no download is active
 - **CPU / GPU / RAM** usage
 - **Discord VC** from the live Discord Desktop accessibility tree, including hidden/tray-minimized Electron windows, channel/server, participant count, Mute/Deafen state and real Mute / Deafen / Leave controls when Discord exposes those UIA patterns
 - Network download/upload throughput
 - System-drive free/total storage
 - Active browser/download-manager partial downloads, including current bytes and measured transfer speed when available
 - Built-in **Focus timer** with 25/45-minute presets, pause/resume and reset
-- Windows notifications: count, source app and latest text when notification-listener access is allowed
+- Windows notifications: count, source app and latest text when notification-listener access is allowed, plus a real Clear all action
 - Battery level/charging state on devices that actually have a battery
 - Clock and date
 
@@ -44,12 +44,12 @@ Notification permission is never requested automatically. If access is not alrea
 
 ## Interaction states
 
-- **Idle** — minimum information for the selected width
+- **Idle** — media/app context, clock, clipped tachometer-style CPU/RAM arcs and compact activity indicators when the selected width allows them
 - **Hover** — subtly wider/deeper
 - **Peek** — reveals selected lower-priority information without opening the full surface
-- **Expanded** — context/media and System stay primary; active Downloads and Discord voice join only when real data exists, with Timers / Storage / optional Notifications / Battery in the lower lane
+- **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM and Discord voice controls, and Notifications when present. The lower row is Timers, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware
 
-Smaller widths remove information instead of shrinking every label. Empty modules do not reserve space: Downloads exists only while a partial download is actively changing, Discord appears only while voice is connected, and optional notification/battery lanes collapse when unavailable. Full Width may reveal extra network/storage/activity status without stretching artwork, text, or progress controls.
+Smaller widths remove information instead of shrinking every label. Downloads still exists only while a partial download is actively changing: otherwise the same middle lane becomes SESSION with foreground-process memory, thread count and uptime. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. The Expanded clock remains the visual anchor above the two-row information layout.
 
 ## Screenshots
 

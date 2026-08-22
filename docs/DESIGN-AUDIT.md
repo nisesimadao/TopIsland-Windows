@@ -71,9 +71,9 @@ Expanded Notch follows the BoringNotch relationship:
 - Authentic Notch: artwork/app icon + one compact status, currently time
 - Compact: add primary title
 - Standard: add subtitle/source when space allows
-- Idle >= 520 dip: allow compact CPU/RAM
+- Idle >= 520 dip: allow compact CPU/RAM as clipped 270-degree tachometer arcs; do not use full 360-degree rings in the compact shell
 - Peek >= 430 dip: allow compact CPU/RAM
-- Expanded: Context/Now Playing and System are the stable primary regions. Active Downloads and connected Communication join only while their real data exists; the lower lane holds Timers, Storage, and optional Notifications/Battery.
+- Expanded: the top row is Context/Now Playing, a large clock-centered Overview (CPU/GPU/RAM, power/thermal summary, live Discord voice controls), and Notifications when real notifications exist. The lower row is Timers, a SESSION lane using live foreground-process telemetry that is replaced by Downloads only while bytes are actively changing, and compact Storage/Network/Hardware metrics.
 
 Do not scale typography down to preserve content. Remove lower-priority content instead.
 
@@ -170,14 +170,14 @@ The overlay is an information surface, not the settings window.
 
 More information is allowed only when the surface has enough room and the data is real.
 
-- Expanded has a stable context/media region and System region. Downloads and Communication are conditional main-row modules that allocate width only while their real activity exists. A lower lane holds Timers, Storage, and optional Notifications/Battery.
+- Expanded keeps three top-level visual anchors: Context/Now Playing, the large clock/telemetry Overview, and Notifications when present. The lower lane holds Timers, active Downloads only, and System metrics. Discord voice controls live inside Overview instead of reserving a permanent standalone column.
 - Secondary groups use vertical hairlines and spacing, not rounded card containers.
-- Downloads must disappear when no partial download is actively changing; a stale `.crdownload`/`.part` file is not enough to justify a module. Communication must disappear when Discord is not in voice.
+- Downloads must disappear when no partial download is actively changing; a stale `.crdownload`/`.part` file is not enough to justify the Downloads module. The same middle slot becomes SESSION when Downloads is absent. Communication controls must disappear when Discord is not in voice.
 - CPU/GPU/RAM are three small aligned metrics with restrained progress bars; Network stays compact telemetry. Do not turn them into separate dashboard cards.
 - Hide a module when the underlying capability is unavailable (for example, Battery on a desktop or Notifications without permission).
 - Never invent download progress, notification content, Discord voice state, battery state, or other live values.
 - Discord voice information must come from the live Discord desktop UI tree, including hidden/tray-minimized `Chrome_WidgetWin_1` windows when `MainWindowHandle` is zero. Show only observed channel/server/count/mute-deafen state. Enable Mute/Deafen/Leave controls only when Discord exposes the matching UI Automation pattern; do not fabricate controls or participant state.
-- Full Width may reveal extra NET / SSD / notification activity, but smaller widths remove those details.
+- Full Width uses otherwise empty center space for short Focus / Voice / active Downloads / Network / Storage segments. Smaller widths remove those segments rather than stretching the content.
 - A future module must justify its space with current or actionable information; an empty placeholder is not a reason to add another container.
 - Windows notification permission must be opt-in. Do not request it automatically at startup.
 - Cross-monitor Follow active app transitions fade out, recalculate for the destination DPI, and fade in instead of visually sliding through unrelated monitor coordinate spaces.
