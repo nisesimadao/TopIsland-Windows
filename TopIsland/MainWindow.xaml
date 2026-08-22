@@ -88,6 +88,9 @@
                     <MenuItem x:Name="DarkThemeMenuItem" Header="Dark" IsCheckable="True" Click="SetDarkTheme_Click"/>
                     <MenuItem x:Name="LightThemeMenuItem" Header="Light" IsCheckable="True" Click="SetLightTheme_Click"/>
                 </MenuItem>
+                <MenuItem Header="Behavior">
+                    <MenuItem x:Name="TopEdgeRevealMenuItem" Header="Reveal on top edge" IsCheckable="True" Click="ToggleTopEdgeReveal_Click" ToolTip="Hide while idle and reveal when the pointer reaches the top-center edge"/>
+                </MenuItem>
                 <Separator/>
                 <MenuItem Header="Quit TopIsland" Click="ExitButton_Click"/>
             </ContextMenu>
@@ -184,10 +187,10 @@
                 </StackPanel>
 
                 <Border Grid.Column="4" Width="1" HorizontalAlignment="Left" Background="{DynamicResource DividerBrush}" Margin="0,5,0,5"/>
-                <Grid Grid.Column="4" Height="34" Width="78" ClipToBounds="True" VerticalAlignment="Center" Margin="6,0,0,0">
-                    <StackPanel x:Name="CompactMetersPanel" Orientation="Horizontal" VerticalAlignment="Top" Visibility="Collapsed" Margin="-3,-4,0,0">
-                        <controls:RadialMeter x:Name="CompactCpuMeter" Width="39" Height="39" ShowLabel="False" IsTachometer="True" Value="0" ProgressBrush="{DynamicResource AccentBrush}" TrackBrush="{DynamicResource DividerBrush}" TextBrush="{DynamicResource PrimaryTextBrush}" SecondaryTextBrush="{DynamicResource TertiaryTextBrush}" Margin="0,0,1,0"/>
-                        <controls:RadialMeter x:Name="CompactRamMeter" Width="39" Height="39" ShowLabel="False" IsTachometer="True" Value="0" ProgressBrush="{DynamicResource AccentBrush}" TrackBrush="{DynamicResource DividerBrush}" TextBrush="{DynamicResource PrimaryTextBrush}" SecondaryTextBrush="{DynamicResource TertiaryTextBrush}"/>
+                <Grid x:Name="CompactMetersHost" Grid.Column="4" Height="34" Width="88" ClipToBounds="False" VerticalAlignment="Center" Margin="6,0,0,0">
+                    <StackPanel x:Name="CompactMetersPanel" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                        <controls:RadialMeter x:Name="CompactCpuMeter" Width="43" Height="34" Label="CPU" ShowLabel="False" IsTachometer="True" Value="0" ProgressBrush="{DynamicResource AccentBrush}" TrackBrush="{DynamicResource DividerBrush}" TextBrush="{DynamicResource PrimaryTextBrush}" SecondaryTextBrush="{DynamicResource TertiaryTextBrush}" Margin="0,0,2,0"/>
+                        <controls:RadialMeter x:Name="CompactRamMeter" Width="43" Height="34" Label="RAM" ShowLabel="False" IsTachometer="True" Value="0" ProgressBrush="{DynamicResource AccentBrush}" TrackBrush="{DynamicResource DividerBrush}" TextBrush="{DynamicResource PrimaryTextBrush}" SecondaryTextBrush="{DynamicResource TertiaryTextBrush}"/>
                     </StackPanel>
                 </Grid>
 

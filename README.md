@@ -46,8 +46,9 @@ Notification permission is never requested automatically. If access is not alrea
 
 ## Interaction states
 
-- **Idle** — media/app context, clock, clipped tachometer-style CPU/RAM arcs and compact activity indicators when the selected width allows them
+- **Idle** — media/app context, clock, open-right tachometer-style usage gauges labeled **CPU / RAM**, plus compact activity indicators when the selected width allows them
 - **Hover** — subtly wider/deeper
+- **Reveal on top edge** — optional mode that fades the idle surface completely away, keeps the hidden region click-through, and softly reveals it when the pointer reaches the top-center edge
 - Hover gives a running Focus timer its own remaining-time + real Pause/Resume control before lower-priority activity text
 - **Peek** — reveals selected lower-priority information without opening the full surface
 - **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM, Power/Thermal and Discord voice controls (or Output/Volume when not in voice), plus Notifications when present. The lower row is Timers, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware/Uptime
@@ -58,11 +59,11 @@ Smaller widths remove information instead of shrinking every label. When no down
 
 <table>
   <tr>
-    <td align="center"><b>Standard Idle · tachometer CPU/RAM</b></td>
+    <td align="center"><b>Compact Notch Idle · labeled CPU/RAM</b></td>
     <td align="center"><b>Hover · active Focus control</b></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/compact-idle.png" alt="TopIsland Standard idle with tachometer CPU and RAM meters"></td>
+    <td><img src="docs/screenshots/compact-idle.png" alt="TopIsland compact Notch idle with labeled open-right CPU and RAM meters"></td>
     <td><img src="docs/screenshots/compact-hover-focus.png" alt="TopIsland hover with running Focus timer and pause control"></td>
   </tr>
 </table>
@@ -91,6 +92,7 @@ Right-click the TopIsland tray icon to configure the app without turning the ove
 - Show / Hide
 - Expand
 - Dynamic Island / Notch
+- Reveal on top edge
 - Width: Authentic / Compact / Standard / Wide / Full Width
 - Material and theme
 - Display: Follow active app / Primary / a fixed connected display

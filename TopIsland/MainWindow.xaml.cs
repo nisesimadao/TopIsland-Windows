@@ -78,6 +78,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _transitionGuardTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private long _visualTransitionSerial;
     private bool _pointerWasInside;
+    private bool _edgeRevealVisualHidden;
 
     public event EventHandler? SettingsChanged;
 
@@ -115,7 +116,7 @@ public partial class MainWindow : Window
     private void MainWindow_SourceInitialized(object? sender, EventArgs e)
     {
         _hwnd = new WindowInteropHelper(this).Handle;
-        _overlayBehavior = new OverlayWindowBehavior(this, point => SurfacePath.Data?.FillContains(point) == true);
+        _overlayBehavior = new OverlayWindowBehavior(this, point => !_edgeRevealVisualHidden && SurfacePath.Data?.FillContains(point) == true);
         _overlayBehavior.DisplayEnvironmentChanged += OverlayBehavior_DisplayEnvironmentChanged;
         _overlayBehavior.Attach();
 
@@ -166,7 +167,7 @@ public partial class MainWindow : Window
         ApplyState(immediate: true);
         UpdateLiveData();
         _statsTimer.Start();
-        _pointerWasInside = IsCursorInsideSurface();
+        _pointerWasInside = IsPointerInteractionActive();
         _pointerTimer.Start();
         if (_pointerWasInside)
         {

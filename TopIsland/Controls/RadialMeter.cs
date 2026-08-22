@@ -125,24 +125,28 @@ public sealed class RadialMeter : FrameworkElement
     private void DrawTachometer(DrawingContext dc)
     {
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        // The compact meter deliberately behaves like a gauge rather than a pie
-        // chart: it starts at the lower-left, climbs clockwise over the top, and
-        // finishes at the lower-right. The parent clips its raised top edge.
-        const double startAngle = 135;
-        const double sweepAngle = 270;
-        var radius = Math.Max(7, Math.Min(ActualWidth, ActualHeight) / 2 - 3.0);
-        var center = new Point(ActualWidth / 2 - 1.0, ActualHeight / 2 - 1.5);
-        var trackPen = CreatePen(TrackBrush, 2.35);
-        var progressPen = CreatePen(ProgressBrush, 3.1);
+        // Compact usage gauge: deliberately open on the right. It reads like
+        // a dashboard tachometer "(" wrapping the label/value instead of a
+        // nearly closed progress ring "( ... )".
+        const double startAngle = 154;
+        const double sweepAngle = 196;
+        var radius = Math.Max(7, Math.Min(ActualHeight - 4, 30) / 2.0);
+        var center = new Point(16.8, ActualHeight / 2 + 1.2);
+        var trackPen = CreatePen(TrackBrush, 2.15);
+        var progressPen = CreatePen(ProgressBrush, 2.9);
 
         dc.DrawGeometry(null, trackPen, CreateArc(center, radius, startAngle, sweepAngle));
 
-        var tickPen = new Pen(TrackBrush, 1.0);
-        for (var index = 0; index <= 6; index++)
+        var tickPen = new Pen(TrackBrush, 0.85)
         {
-            var angle = startAngle + sweepAngle * index / 6.0;
-            var outer = PointOnCircle(center, radius + 0.2, angle);
-            var inner = PointOnCircle(center, radius - 2.6, angle);
+            StartLineCap = PenLineCap.Round,
+            EndLineCap = PenLineCap.Round
+        };
+        for (var index = 1; index < 5; index++)
+        {
+            var angle = startAngle + sweepAngle * index / 5.0;
+            var outer = PointOnCircle(center, radius + 0.1, angle);
+            var inner = PointOnCircle(center, radius - 2.1, angle);
             dc.DrawLine(tickPen, inner, outer);
         }
 
@@ -152,7 +156,15 @@ public sealed class RadialMeter : FrameworkElement
             dc.DrawGeometry(null, progressPen, CreateArc(center, radius, startAngle, sweepAngle * value / 100));
         }
 
-        DrawValue(dc, dpi, new Point(center.X + 1.0, center.Y + 2.2), 9.2, value);
+        var labelText = new FormattedText(Label, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI Variable"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+            7.0, SecondaryTextBrush, dpi);
+        dc.DrawText(labelText, new Point(20.0, 4.2));
+
+        var valueText = new FormattedText($"{value:0}%", CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI Variable"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+            8.8, TextBrush, dpi);
+        dc.DrawText(valueText, new Point(19.6, 13.2));
     }
 
     private void DrawValue(DrawingContext dc, double dpi, Point center, double fontSize, double value)

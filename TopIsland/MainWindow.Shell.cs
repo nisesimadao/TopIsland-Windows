@@ -157,6 +157,14 @@ public partial class MainWindow
     private void SetSystemTheme_Click(object sender, RoutedEventArgs e) => SetTheme(AppThemeMode.System);
     private void SetDarkTheme_Click(object sender, RoutedEventArgs e) => SetTheme(AppThemeMode.Dark);
     private void SetLightTheme_Click(object sender, RoutedEventArgs e) => SetTheme(AppThemeMode.Light);
+    private void ToggleTopEdgeReveal_Click(object sender, RoutedEventArgs e) =>
+        SetTopEdgeReveal(!_settings.RevealOnTopEdge);
+
+    public void SetTopEdgeReveal(bool enabled)
+    {
+        _settings.RevealOnTopEdge = enabled;
+        SaveAndRefresh();
+    }
 
     public void SetStyle(IslandStyle style)
     {
@@ -289,6 +297,7 @@ public partial class MainWindow
         MaterialYouTopContainer.Visibility = materialYou ? Visibility.Visible : Visibility.Collapsed;
         MaterialYouBottomContainer.Visibility = materialYou ? Visibility.Visible : Visibility.Collapsed;
         LightThemeMenuItem.IsChecked = _settings.Theme == AppThemeMode.Light;
+        TopEdgeRevealMenuItem.IsChecked = _settings.RevealOnTopEdge;
 
         UpdateCompactDensity();
     }
@@ -309,10 +318,13 @@ public partial class MainWindow
             : Visibility.Collapsed;
         CompactDateText.Visibility = baseWidth >= 500 ? Visibility.Visible : Visibility.Collapsed;
 
-        var showCompactMeters = baseWidth >= 500 || (peek && baseWidth >= 360);
-        CompactMetersPanel.Visibility = showCompactMeters ? Visibility.Visible : Visibility.Collapsed;
-        CompactCpuMeter.Visibility = showCompactMeters ? Visibility.Visible : Visibility.Collapsed;
-        CompactRamMeter.Visibility = showCompactMeters ? Visibility.Visible : Visibility.Collapsed;
+        var compactSurface = _state != SurfaceState.Expanded;
+        var showRamMeter = compactSurface && baseWidth >= 300;
+        CompactMetersHost.Width = showRamMeter ? 88 : 43;
+        CompactMetersHost.Margin = baseWidth < 300 ? new Thickness(3, 0, 0, 0) : new Thickness(6, 0, 0, 0);
+        CompactMetersPanel.Visibility = compactSurface ? Visibility.Visible : Visibility.Collapsed;
+        CompactCpuMeter.Visibility = compactSurface ? Visibility.Visible : Visibility.Collapsed;
+        CompactRamMeter.Visibility = showRamMeter ? Visibility.Visible : Visibility.Collapsed;
 
         FullWidthInfoPanel.Visibility = baseWidth >= 1400 ? Visibility.Visible : Visibility.Collapsed;
         FullSettingsButton.Visibility = baseWidth >= 1400 ? Visibility.Visible : Visibility.Collapsed;

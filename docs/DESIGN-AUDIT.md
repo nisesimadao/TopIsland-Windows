@@ -68,11 +68,11 @@ Expanded Notch follows the BoringNotch relationship:
 
 ### Density
 
-- Authentic Notch: artwork/app icon + one compact status, currently time
+- Authentic Notch: artwork/app icon + time + one labeled compact usage gauge when space permits
 - Compact: add primary title
 - Standard: add subtitle/source when space allows
-- Idle >= 520 dip: allow compact CPU/RAM as clipped 270-degree tachometer arcs; do not use full 360-degree rings in the compact shell. Sample changes should interpolate briefly instead of snapping.
-- Peek >= 430 dip: allow compact CPU/RAM
+- Compact shell: usage gauges are labeled CPU/RAM and use an open-right ~196-degree tachometer arc; never draw the closing right-side parenthesis. Authentic width keeps CPU only, Compact and larger may show CPU + RAM. Gauges must fit their own 34 dip slot without negative-offset clipping. Sample changes interpolate briefly instead of snapping.
+- Peek follows the same labeled CPU/RAM gauge density rules as Idle; it may reveal more contextual text, not a different gauge geometry
 - Hover/Peek: a running Focus timer gets the dedicated remaining-time + Pause/Resume control; otherwise show at most one lower-priority activity summary at Standard width
 - Expanded: the top row is Context/Now Playing, a large clock-centered Overview (CPU/GPU/RAM, power/thermal summary, live Discord voice controls or real audio output/volume when not in voice), and Notifications when real notifications exist. The lower row is Timers, a SESSION lane using live foreground-process telemetry that is replaced by Downloads only while bytes are actively changing, and compact Storage/Network/Hardware/Uptime metrics.
 
@@ -163,7 +163,7 @@ A wider shell does not justify stretching its content.
 The overlay is an information surface, not the settings window.
 
 - Persistent configuration belongs in the system tray or context menu, not as a permanent card inside Expanded.
-- The tray exposes Show/Hide, Expand, Style, Width, Material, Theme, Display, Focus timer controls, notification permission when needed, launch-at-startup, and Quit.
+- The tray exposes Show/Hide, Expand, Style, Width, Material, Theme, **Behavior / Reveal on top edge**, Display, Focus timer controls, notification permission when needed, launch-at-startup, and Quit.
 - Display choices are Follow active app, Primary display, or an explicit connected display.
 - Tray and overlay context-menu actions write to the same persisted settings model.
 - Launch-at-startup is always opt-in; installation must not silently enable it.

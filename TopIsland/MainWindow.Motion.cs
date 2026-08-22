@@ -33,7 +33,7 @@ public partial class MainWindow
 
     private void PointerTimer_Tick(object? sender, EventArgs e)
     {
-        var inside = IsCursorInsideSurface();
+        var inside = IsPointerInteractionActive();
         if (inside == _pointerWasInside)
         {
             return;
@@ -87,7 +87,7 @@ public partial class MainWindow
     private void PeekTimer_Tick(object? sender, EventArgs e)
     {
         _peekTimer.Stop();
-        if (_state != SurfaceState.Hover || !IsCursorInsideSurface())
+        if (_state != SurfaceState.Hover || !IsPointerInteractionActive())
         {
             return;
         }
@@ -110,7 +110,7 @@ public partial class MainWindow
             return;
         }
 
-        if (IsCursorInsideSurface())
+        if (IsPointerInteractionActive())
         {
             return;
         }
@@ -138,6 +138,28 @@ public partial class MainWindow
         var transform = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
         var local = transform.Transform(new Point(cursor.X, cursor.Y));
         return SurfacePath.Data.FillContains(local);
+    }
+
+    private bool IsPointerInteractionActive()
+    {
+        if (_edgeRevealVisualHidden)
+        {
+            return IsCursorInsideTopRevealZone();
+        }
+
+        return IsCursorInsideSurface()
+               || (_settings.RevealOnTopEdge && _state != SurfaceState.Expanded && IsCursorInsideTopRevealZone());
+    }
+
+    private bool IsCursorInsideTopRevealZone()
+    {
+        if (!_settings.RevealOnTopEdge || _currentMonitor is null || !GetCursorPos(out var cursor))
+        {
+            return false;
+        }
+
+        var baseWidth = ResolveBaseSurfaceWidth(_currentMonitor.DipWidth);
+        return TopEdgeRevealCalculator.Contains(_currentMonitor, baseWidth, cursor.X, cursor.Y);
     }
 
     private void CompactBar_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -198,7 +220,9 @@ public partial class MainWindow
         SurfacePath.SetResourceReference(System.Windows.Shapes.Path.FillProperty,
             _state is SurfaceState.Hover or SurfaceState.Peek ? "SurfaceHoverBrush" : "SurfaceBrush");
 
-        var shadowOpacity = _state switch
+        ApplyEdgeRevealVisual(immediate);
+        var edgeHidden = _settings.RevealOnTopEdge && _state == SurfaceState.Idle;
+        var shadowOpacity = edgeHidden ? 0.0 : _state switch
         {
             SurfaceState.Idle => _settings.Style == IslandStyle.Notch ? 0.0 : 0.16,
             SurfaceState.Expanded => _settings.Style == IslandStyle.Notch ? 0.34 : 0.30,
@@ -216,6 +240,26 @@ public partial class MainWindow
         UpdateCompactDensity();
         AnimateWindow(target.Width, target.Height, target.Top, duration);
         UpdateGeometry();
+    }
+
+    private void ApplyEdgeRevealVisual(bool immediate)
+    {
+        var hidden = _settings.RevealOnTopEdge && _state == SurfaceState.Idle;
+        _edgeRevealVisualHidden = hidden;
+        Root.IsHitTestVisible = !hidden;
+
+        var targetOpacity = hidden ? 0.0 : 1.0;
+        if (immediate)
+        {
+            SurfacePath.BeginAnimation(OpacityProperty, null);
+            ContentHost.BeginAnimation(OpacityProperty, null);
+            SurfacePath.Opacity = targetOpacity;
+            ContentHost.Opacity = targetOpacity;
+            return;
+        }
+
+        AnimateOpacity(SurfacePath, targetOpacity, hidden ? 110 : 145, 0);
+        AnimateOpacity(ContentHost, targetOpacity, hidden ? 85 : 135, hidden ? 0 : 12);
     }
 
     private void ApplyCompactContent(bool immediate)

@@ -46,8 +46,9 @@ Windows通知の権限は起動時に勝手に要求しません。許可がな�
 
 ## 表示状態
 
-- **Idle** — Media/Active App、時計、幅に余裕があれば上へ見切れたタコメーター型CPU/RAMアークと通知/Downloadインジケータ
+- **Idle** — Media/Active App、時計、右側を開けた **CPU / RAM** ラベル付きタコメーター型usage gaugeと通知/Downloadインジケータ。Authentic幅ではCPUだけ表示
 - **Hover** — わずかに広く・深くなる
+- **Reveal on top edge** — 任意でIdle時に完全非表示・クリック透過にし、画面上端中央へポインタを持っていくとふわっと再表示
 - **Peek** — Full Expandせず、優先度の低い情報を少し追加
 - **Expanded** — 上段は Context / Now Playing、中央の大きな時計＋CPU/GPU/RAM＋Power/温度＋Discord VC操作（VCがない時はOutput/Volume）、通知がある時だけNotifications。下段はTimers、通常時はSESSION、Download中だけDOWNLOADSへ置換、右にStorage / Network / Hardware/Uptimeです
 
@@ -57,11 +58,11 @@ Windows通知の権限は起動時に勝手に要求しません。許可がな�
 
 <table>
   <tr>
-    <td align="center"><b>Standard Idle · tachometer CPU/RAM</b></td>
+    <td align="center"><b>Compact Notch Idle · labeled CPU/RAM</b></td>
     <td align="center"><b>Hover · active Focus control</b></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/compact-idle.png" alt="TopIsland Standard idle with tachometer CPU and RAM meters"></td>
+    <td><img src="docs/screenshots/compact-idle.png" alt="TopIsland compact Notch idle with labeled open-right CPU and RAM meters"></td>
     <td><img src="docs/screenshots/compact-hover-focus.png" alt="TopIsland hover with running Focus timer and pause control"></td>
   </tr>
 </table>
@@ -90,6 +91,7 @@ TopIsland本体を設定画面化せず、Trayアイコンの右クリックか�
 - Show / Hide
 - Expand
 - Dynamic Island / Notch
+- Reveal on top edge
 - Width: Authentic / Compact / Standard / Wide / Full Width
 - Material / Theme
 - Display: Follow active app / Primary / 固定モニター

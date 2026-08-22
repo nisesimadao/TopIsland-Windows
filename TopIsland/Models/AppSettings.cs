@@ -49,6 +49,7 @@ public sealed class AppSettings
     public double SideMargin { get; set; } = 20;
     public bool EnableHoverPeek { get; set; } = true;
     public int HoverPeekDelayMs { get; set; } = 650;
+    public bool RevealOnTopEdge { get; set; }
     public bool StartExpanded { get; set; }
     public MonitorMode MonitorMode { get; set; } = MonitorMode.FollowActiveApp;
     public string? MonitorDeviceName { get; set; }

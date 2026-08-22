@@ -70,6 +70,9 @@ public sealed class TrayIconService : IDisposable
             CheckedItem("Dark", settings.Theme == AppThemeMode.Dark, () => _window.SetTheme(AppThemeMode.Dark)),
             CheckedItem("Light", settings.Theme == AppThemeMode.Light, () => _window.SetTheme(AppThemeMode.Light))));
 
+        _menu.Items.Add(Submenu("Behavior",
+            CheckedItem("Reveal on top edge", settings.RevealOnTopEdge, () => _window.SetTopEdgeReveal(!settings.RevealOnTopEdge))));
+
         var displayMenu = new Forms.ToolStripMenuItem("Display");
         displayMenu.DropDownItems.Add(CheckedItem(
             "Follow active app",

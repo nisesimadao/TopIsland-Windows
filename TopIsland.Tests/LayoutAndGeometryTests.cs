@@ -168,6 +168,18 @@ public sealed class LayoutAndGeometryTests
         Assert.False(DownloadMonitorService.HasRecentActivity(now.AddMinutes(-10), now));
     }
 
+    [Fact]
+    public void TopEdgeRevealZoneAcceptsTopCenterAcrossScaling()
+    {
+        var monitor = new MonitorDescriptor(IntPtr.Zero, "DISPLAY", 100, 40, 2660, 1480, 150, true);
+        var centerX = monitor.Left + monitor.PixelWidth / 2;
+
+        Assert.True(TopEdgeRevealCalculator.Contains(monitor, 560, centerX, monitor.Top));
+        Assert.True(TopEdgeRevealCalculator.Contains(monitor, 560, centerX, monitor.Top + 20));
+        Assert.False(TopEdgeRevealCalculator.Contains(monitor, 560, centerX, monitor.Top + 30));
+        Assert.False(TopEdgeRevealCalculator.Contains(monitor, 560, monitor.Left + 10, monitor.Top + 4));
+    }
+
     [Theory]
     [InlineData("archive.zip.crdownload", "archive.zip")]
     [InlineData("video.mp4.part", "video.mp4")]
