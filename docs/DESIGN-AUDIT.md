@@ -1,4 +1,4 @@
-﻿# TopIsland design audit
+# TopIsland design audit
 
 This document is the visual baseline for TopIsland. It exists to prevent future changes from drifting back into generic dashboard / glass-card UI.
 

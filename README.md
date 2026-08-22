@@ -31,6 +31,7 @@ TopIsland currently uses real Windows/application data for:
 - Windows GMTC media title, source, artwork, playback position, interactive seek and Previous / Play-Pause / Next
 - Foreground application title, process and executable icon; Expanded also shows live foreground-process CPU, memory and process uptime in the SESSION lane when no download is active
 - **CPU / GPU / RAM** usage
+- Compact CPU/RAM use a clipped **270-degree tachometer sweep**: usage climbs clockwise from the lower-left across the top instead of behaving like a full circular progress ring
 - **Discord VC** from the live Discord Desktop accessibility tree, including hidden/tray-minimized Electron windows, channel/server, participant count, Mute/Deafen state and real Mute / Deafen / Leave controls when Discord exposes those UIA patterns
 - Network download/upload throughput
 - System-drive free/total storage
@@ -49,10 +50,14 @@ Notification permission is never requested automatically. If access is not alrea
 - **Peek** — reveals selected lower-priority information without opening the full surface
 - **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM and Discord voice controls, and Notifications when present. The lower row is Timers, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware
 
-Smaller widths remove information instead of shrinking every label. Downloads still exists only while a partial download is actively changing: otherwise the same middle lane becomes SESSION with foreground-process CPU, memory and uptime. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. The Expanded clock remains the visual anchor above the two-row information layout.
+Smaller widths remove information instead of shrinking every label. When no download is moving, the lower middle lane shows the foreground **SESSION** (process, memory, CPU, threads and uptime); an active download replaces that lane instead of creating another permanent card. Downloads still exists only while a partial download is actively changing: otherwise the same middle lane becomes SESSION with foreground-process CPU, memory and uptime. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. The Expanded clock remains the visual anchor above the two-row information layout.
 
 ## Screenshots
 
+<p align="center">
+  <b>Standard Idle · tachometer CPU/RAM</b><br>
+  <img src="docs/screenshots/compact-idle.png" alt="TopIsland Standard idle with tachometer CPU and RAM meters" width="72%">
+</p>
 <table>
   <tr>
     <td align="center"><b>Dynamic Island · Material You</b></td>
