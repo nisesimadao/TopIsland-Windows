@@ -23,6 +23,27 @@ public static class MotionProfile
         return Ease(Math.Clamp((value - start) / (end - start), 0.0, 1.0));
     }
 
+
+    private static double Range(double value, double start, double end)
+    {
+        if (end <= start) return value >= end ? 1.0 : 0.0;
+        return Math.Clamp((value - start) / (end - start), 0.0, 1.0);
+    }
+
+    // ShapeProgress has already gone through the shell easing. Do not ease these
+    // ranges a second time: double-easing held content still, then made it jump.
+    public static double CompactExit(double expansion) => Range(expansion, 0.02, 0.64);
+    public static double ExpandedTopEnter(double expansion) => Range(expansion, 0.02, 0.64);
+    public static double ExpandedBottomEnter(double expansion) => Range(expansion, 0.10, 0.82);
+    public static double ExpandedTopLeftEnter(double expansion) => Range(expansion, 0.02, 0.62);
+    public static double ExpandedTopRightEnter(double expansion) => Range(expansion, 0.04, 0.66);
+    public static double ExpandedBottomLeftEnter(double expansion) => Range(expansion, 0.10, 0.78);
+    public static double ExpandedBottomMiddleEnter(double expansion) => Range(expansion, 0.14, 0.84);
+    public static double ExpandedBottomRightEnter(double expansion) => Range(expansion, 0.18, 0.88);
+
+    public const double CompactTravelY = 44.0;
+    public const double ExpandedTopTravelY = 34.0;
+    public const double ExpandedBottomTravelY = 52.0;
     public static IEasingFunction CreateWpfEasing() =>
         new SineEase { EasingMode = EasingMode.EaseInOut };
 

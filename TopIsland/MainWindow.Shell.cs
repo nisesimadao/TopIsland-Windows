@@ -135,8 +135,12 @@ public partial class MainWindow
             return;
         }
 
-        _currentTopDip = _targetTopDip;
-        _monitorService.PositionWindow(_hwnd, _currentMonitor, _currentTopDip);
+        var hostTop = _motionHostConfigured ? _motionHostTopDip : _targetTopDip;
+        if (!_motionHostConfigured)
+        {
+            _currentTopDip = _targetTopDip;
+        }
+        _monitorService.PositionWindow(_hwnd, _currentMonitor, hostTop);
     }
 
     private void SetDynamicIsland_Click(object sender, RoutedEventArgs e) => SetStyle(IslandStyle.DynamicIsland);

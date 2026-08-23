@@ -96,24 +96,51 @@
             </ContextMenu>
         </Grid.ContextMenu>
 
+        <!-- DropShadowEffect re-rasterizes the changing path every frame. Two
+             antialiased shadow strokes preserve the soft depth cue while staying
+             in the normal vector compositor path at high refresh rates. -->
+        <Path x:Name="ShadowOuterPath"
+              Fill="Transparent"
+              Stroke="#000000"
+              StrokeThickness="11"
+              StrokeLineJoin="Round"
+              Opacity="0"
+              IsHitTestVisible="False">
+            <Path.RenderTransform><TranslateTransform Y="2.5"/></Path.RenderTransform>
+        </Path>
+        <Path x:Name="ShadowInnerPath"
+              Fill="Transparent"
+              Stroke="#000000"
+              StrokeThickness="5"
+              StrokeLineJoin="Round"
+              Opacity="0"
+              IsHitTestVisible="False">
+            <Path.RenderTransform><TranslateTransform Y="1.5"/></Path.RenderTransform>
+        </Path>
+        <Grid x:Name="BackdropSnapshotLayer"
+              Visibility="Collapsed"
+              IsHitTestVisible="False"
+              SnapsToDevicePixels="True"
+              RenderTransformOrigin="0.5,0">
+            <Grid.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="BackdropSnapshotScale" ScaleX="1" ScaleY="1"/>
+                    <TranslateTransform x:Name="BackdropSnapshotTranslate"/>
+                </TransformGroup>
+            </Grid.RenderTransform>
+            <Image x:Name="BackdropSnapshotImage" Stretch="Fill" SnapsToDevicePixels="True"/>
+        </Grid>
         <Path x:Name="SurfacePath"
               Fill="{DynamicResource SurfaceBrush}"
               Stroke="{DynamicResource SurfaceBorderBrush}"
-              StrokeThickness="1">
-            <Path.Effect>
-                <DropShadowEffect x:Name="SurfaceShadow"
-                                  BlurRadius="10"
-                                  ShadowDepth="3"
-                                  Direction="270"
-                                  Opacity="0.20"
-                                  RenderingBias="Performance"
-                                  Color="#000000"/>
-            </Path.Effect>
-        </Path>
+              StrokeThickness="1"/>
 
         <Grid x:Name="ContentHost"
               TextElement.Foreground="{DynamicResource PrimaryTextBrush}"
               TextOptions.TextFormattingMode="Display">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="ContentHostTranslate"/>
+            </Grid.RenderTransform>
             <Grid x:Name="CompactBar"
                   Height="34"
                   VerticalAlignment="Top"
@@ -224,7 +251,7 @@
                 </StackPanel>
             </Grid>
 
-            <Grid x:Name="ExpandedPanel" Visibility="Hidden" Opacity="1" Margin="32,24,32,24">
+            <Grid x:Name="ExpandedPanel" Visibility="Visible" IsHitTestVisible="False" Opacity="1" Margin="32,24,32,24">
                 <Grid.RenderTransform><TranslateTransform x:Name="ExpandedTranslate" Y="-4"/></Grid.RenderTransform>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>

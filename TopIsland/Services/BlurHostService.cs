@@ -10,6 +10,11 @@ public sealed class BlurHostService : IDisposable
     // GetProp == 0 can continue to mean "property unavailable / legacy host".
     internal const string RevealProgressProperty = "TopIsland.BlurRevealProgress";
     internal const string ShapeProgressProperty = "TopIsland.BlurShapeProgress";
+    internal const string SurfaceWidthProperty = "TopIsland.BlurSurfaceWidth";
+    internal const string SurfaceHeightProperty = "TopIsland.BlurSurfaceHeight";
+    internal const string SurfaceOffsetXProperty = "TopIsland.BlurSurfaceOffsetX";
+    internal const string SurfaceOffsetYProperty = "TopIsland.BlurSurfaceOffsetY";
+    internal const string MotionSnapshotProperty = "TopIsland.BlurMotionSnapshot";
 
     private Process? _process;
 
@@ -94,6 +99,60 @@ public sealed class BlurHostService : IDisposable
         }
     }
 
+
+    public static void SetSurfaceBounds(IntPtr targetHwnd, double width, double height, double offsetX, double offsetY)
+    {
+        if (targetHwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        _ = SetProp(targetHwnd, SurfaceWidthProperty, EncodeMetric(width));
+        _ = SetProp(targetHwnd, SurfaceHeightProperty, EncodeMetric(height));
+        _ = SetProp(targetHwnd, SurfaceOffsetXProperty, EncodeMetric(offsetX));
+        _ = SetProp(targetHwnd, SurfaceOffsetYProperty, EncodeMetric(offsetY));
+    }
+
+    public static void ClearSurfaceBounds(IntPtr targetHwnd)
+    {
+        if (targetHwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        _ = RemoveProp(targetHwnd, SurfaceWidthProperty);
+        _ = RemoveProp(targetHwnd, SurfaceHeightProperty);
+        _ = RemoveProp(targetHwnd, SurfaceOffsetXProperty);
+        _ = RemoveProp(targetHwnd, SurfaceOffsetYProperty);
+    }
+
+    public static void SetMotionSnapshotActive(IntPtr targetHwnd, bool active)
+    {
+        if (targetHwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        if (active)
+        {
+            _ = SetProp(targetHwnd, MotionSnapshotProperty, new IntPtr(1));
+        }
+        else
+        {
+            _ = RemoveProp(targetHwnd, MotionSnapshotProperty);
+        }
+    }
+
+    public static void ClearMotionSnapshotActive(IntPtr targetHwnd)
+    {
+        if (targetHwnd != IntPtr.Zero)
+        {
+            _ = RemoveProp(targetHwnd, MotionSnapshotProperty);
+        }
+    }
+
+    private static IntPtr EncodeMetric(double value) =>
+        new(1 + (int)Math.Round(Math.Max(0, value) * 100.0));
 
     public void Stop()
     {

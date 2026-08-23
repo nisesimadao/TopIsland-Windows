@@ -10,6 +10,13 @@ internal readonly record struct BlurFrameOptions(
     byte TintG,
     byte TintB);
 
+/// <summary>
+/// Layered-window renderer with two cadences:
+/// - desktop capture + Gaussian blur refreshes a cached full-host backdrop;
+/// - shape/size/reveal composition samples that cache at the display cadence.
+/// This keeps the expensive filter out of most animation frames without lowering
+/// the blur resolution or the geometric animation frame rate.
+/// </summary>
 internal sealed class SkiaBlurRenderer : IDisposable
 {
     private const float BlurWorkingScale = 0.50f;
@@ -32,9 +39,10 @@ internal sealed class SkiaBlurRenderer : IDisposable
     private IntPtr _outputOld;
     private IntPtr _outputBits;
 
-    private int _width;
-    private int _height;
+    private int _capacityWidth;
+    private int _capacityHeight;
     private bool _disposed;
+    private bool _backdropValid;
 
     private SKBitmap? _sourceSkia;
     private SKBitmap? _outputSkia;
@@ -58,24 +66,74 @@ internal sealed class SkiaBlurRenderer : IDisposable
         _hostHwnd = hostHwnd;
     }
 
+    public void InvalidateBackdrop() => _backdropValid = false;
+
     public bool Render(
-        int screenX,
-        int screenY,
-        int width,
-        int height,
+        int hostScreenX,
+        int hostScreenY,
+        int hostWidth,
+        int hostHeight,
+        int surfaceOffsetX,
+        int surfaceOffsetY,
+        int surfaceWidth,
+        int surfaceHeight,
         double scale,
         int style,
         double shapeProgress,
         double revealProgress,
-        BlurFrameOptions options)
+        BlurFrameOptions options,
+        bool refreshBackdrop)
     {
-        if (_disposed || width <= 0 || height <= 0)
+        if (_disposed || hostWidth <= 0 || hostHeight <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0)
         {
             return false;
         }
 
-        EnsureBuffers(width, height);
+        EnsureBuffers(hostWidth, hostHeight);
+        EnsureSkiaResources(scale, options);
+        if (refreshBackdrop || !_backdropValid)
+        {
+            if (!RefreshBackdrop(hostScreenX, hostScreenY, hostWidth, hostHeight))
+            {
+                return false;
+            }
+        }
+        EnsureShapePath(surfaceWidth, surfaceHeight, scale, style, shapeProgress, revealProgress);
+        if (_outputCanvas is null || _blurSkia is null || _shapePath is null || _tintPaint is null)
+        {
+            return false;
+        }
 
+        var workingLeft = (float)(surfaceOffsetX * BlurWorkingScale);
+        var workingTop = (float)(surfaceOffsetY * BlurWorkingScale);
+        var workingRight = (float)((surfaceOffsetX + surfaceWidth) * BlurWorkingScale);
+        var workingBottom = (float)((surfaceOffsetY + surfaceHeight) * BlurWorkingScale);
+        var blurSource = new SKRect(workingLeft, workingTop, workingRight, workingBottom);
+        var localSurface = new SKRect(0, 0, surfaceWidth, surfaceHeight);
+        var hostRect = new SKRect(0, 0, hostWidth, hostHeight);
+
+        // Keep the layered HWND at the full host envelope. Resizing/moving a
+        // layered window every shape frame was itself paced near 60 Hz. Clearing
+        // the fixed transparent canvas and moving only pixels in Skia avoids that
+        // native-window churn while keeping the transparent area click-through.
+        _outputCanvas.Save();
+        _outputCanvas.ClipRect(hostRect, SKClipOperation.Intersect, antialias: false);
+        _outputCanvas.DrawColor(SKColors.Transparent, SKBlendMode.Src);
+        _outputCanvas.Translate(surfaceOffsetX, surfaceOffsetY);
+        _outputCanvas.ClipPath(_shapePath, SKClipOperation.Intersect, antialias: true);
+        _outputCanvas.DrawBitmap(
+            _blurSkia,
+            blurSource,
+            localSurface,
+            new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
+
+        if (options.TintAlpha > 0)
+        {
+            _outputCanvas.DrawRect(localSurface, _tintPaint);
+        }
+
+        _outputCanvas.Restore();
+        _outputCanvas.Flush();
         var screenDc = GetDC(IntPtr.Zero);
         if (screenDc == IntPtr.Zero)
         {
@@ -84,57 +142,8 @@ internal sealed class SkiaBlurRenderer : IDisposable
 
         try
         {
-            // SRCCOPY excludes the layered TopIsland and BlurHost windows, so this
-            // buffer is the real desktop/application content underneath the surface.
-            if (!BitBlt(_captureDc, 0, 0, width, height, screenDc, screenX, screenY, SrcCopy))
-            {
-                return false;
-            }
-
-            EnsureSkiaResources(width, height, scale, style, shapeProgress, revealProgress, options);
-            if (_sourceSkia is null || _outputCanvas is null || _blurSkia is null ||
-                _blurCanvas is null || _shapePath is null || _blurPaint is null || _tintPaint is null)
-            {
-                return false;
-            }
-
-            // Backdrop blur runs on a half-resolution working surface. A Gaussian
-            // blur discards the high-frequency detail that downsampling removes,
-            // cutting filter cost sharply without changing the apparent radius.
-            _blurCanvas.Clear(SKColors.Transparent);
-            var blurWidth = Math.Max(1, (int)Math.Ceiling(width * BlurWorkingScale));
-            var blurHeight = Math.Max(1, (int)Math.Ceiling(height * BlurWorkingScale));
-            var sourceRect = new SKRect(0, 0, width, height);
-            var blurDestination = new SKRect(0, 0, blurWidth, blurHeight);
-            _blurCanvas.DrawBitmap(
-                _sourceSkia,
-                sourceRect,
-                blurDestination,
-                new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None),
-                _blurPaint);
-            _blurCanvas.Flush();
-
-            _outputCanvas.Clear(SKColors.Transparent);
-            _outputCanvas.Save();
-            _outputCanvas.ClipPath(_shapePath, SKClipOperation.Intersect, antialias: true);
-            var blurSource = new SKRect(0, 0, blurWidth, blurHeight);
-            var outputDestination = new SKRect(0, 0, width, height);
-            _outputCanvas.DrawBitmap(
-                _blurSkia,
-                blurSource,
-                outputDestination,
-                new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
-
-            if (options.TintAlpha > 0)
-            {
-                _outputCanvas.DrawRect(0, 0, width, height, _tintPaint);
-            }
-
-            _outputCanvas.Restore();
-            _outputCanvas.Flush();
-
-            var dst = new NativePoint(screenX, screenY);
-            var size = new NativeSize(width, height);
+            var dst = new NativePoint(hostScreenX, hostScreenY);
+            var size = new NativeSize(hostWidth, hostHeight);
             var src = new NativePoint(0, 0);
             var blend = new BlendFunction
             {
@@ -145,8 +154,7 @@ internal sealed class SkiaBlurRenderer : IDisposable
                     : (byte)Math.Round(255 * Math.Clamp(revealProgress, 0, 1)),
                 AlphaFormat = AcSrcAlpha
             };
-
-            return UpdateLayeredWindow(
+            var presented = UpdateLayeredWindow(
                 _hostHwnd,
                 screenDc,
                 ref dst,
@@ -156,59 +164,74 @@ internal sealed class SkiaBlurRenderer : IDisposable
                 0,
                 ref blend,
                 UlwAlpha);
+            return presented;
         }
         finally
         {
             ReleaseDC(IntPtr.Zero, screenDc);
         }
     }
+    private bool RefreshBackdrop(int screenX, int screenY, int width, int height)
+    {
+        if (_sourceSkia is null || _blurCanvas is null || _blurSkia is null || _blurPaint is null)
+        {
+            return false;
+        }
 
-    private void EnsureSkiaResources(
-        int width,
-        int height,
-        double scale,
-        int style,
-        double shapeProgress,
-        double revealProgress,
-        BlurFrameOptions options)
+        var screenDc = GetDC(IntPtr.Zero);
+        if (screenDc == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (!BitBlt(_captureDc, 0, 0, width, height, screenDc, screenX, screenY, SrcCopy))
+            {
+                return false;
+            }
+        }
+        finally
+        {
+            ReleaseDC(IntPtr.Zero, screenDc);
+        }
+
+        var blurWidth = Math.Max(1, (int)Math.Ceiling(width * BlurWorkingScale));
+        var blurHeight = Math.Max(1, (int)Math.Ceiling(height * BlurWorkingScale));
+        _blurCanvas.Save();
+        _blurCanvas.ClipRect(new SKRect(0, 0, blurWidth, blurHeight));
+        _blurCanvas.DrawColor(SKColors.Transparent, SKBlendMode.Src);
+        _blurCanvas.DrawBitmap(
+            _sourceSkia,
+            new SKRect(0, 0, width, height),
+            new SKRect(0, 0, blurWidth, blurHeight),
+            new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None),
+            _blurPaint);
+        _blurCanvas.Restore();
+        _blurCanvas.Flush();
+        _backdropValid = true;
+        return true;
+    }
+
+    private void EnsureSkiaResources(double scale, BlurFrameOptions options)
     {
         if (_sourceSkia is null || _outputSkia is null || _blurSkia is null || _outputCanvas is null || _blurCanvas is null)
         {
             _sourceSkia = new SKBitmap();
             _outputSkia = new SKBitmap();
-            var sourceInfo = new SKImageInfo(_width, _height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-            var outputInfo = new SKImageInfo(_width, _height, SKColorType.Bgra8888, SKAlphaType.Premul);
-            if (!_sourceSkia.InstallPixels(sourceInfo, _captureBits, _width * 4) ||
-                !_outputSkia.InstallPixels(outputInfo, _outputBits, _width * 4))
+            var sourceInfo = new SKImageInfo(_capacityWidth, _capacityHeight, SKColorType.Bgra8888, SKAlphaType.Opaque);
+            var outputInfo = new SKImageInfo(_capacityWidth, _capacityHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+            if (!_sourceSkia.InstallPixels(sourceInfo, _captureBits, _capacityWidth * 4) ||
+                !_outputSkia.InstallPixels(outputInfo, _outputBits, _capacityWidth * 4))
             {
                 throw new InvalidOperationException("Could not attach Skia bitmaps to blur buffers.");
             }
 
-            var blurWidth = Math.Max(1, (int)Math.Ceiling(width * BlurWorkingScale));
-            var blurHeight = Math.Max(1, (int)Math.Ceiling(height * BlurWorkingScale));
+            var blurWidth = Math.Max(1, (int)Math.Ceiling(_capacityWidth * BlurWorkingScale));
+            var blurHeight = Math.Max(1, (int)Math.Ceiling(_capacityHeight * BlurWorkingScale));
             _blurSkia = new SKBitmap(new SKImageInfo(blurWidth, blurHeight, SKColorType.Bgra8888, SKAlphaType.Premul));
             _outputCanvas = new SKCanvas(_outputSkia);
             _blurCanvas = new SKCanvas(_blurSkia);
-        }
-
-        var shapeChanged = Math.Abs(_cachedShapeProgress - shapeProgress) > 0.001;
-        var revealChangesShape = style == 1 && Math.Abs(_cachedRevealProgress - revealProgress) > 0.001;
-        if (_shapePath is null
-            || _cachedStyle != style
-            || _cachedShapeWidth != width
-            || _cachedShapeHeight != height
-            || Math.Abs(_cachedScale - scale) > 0.001
-            || shapeChanged
-            || revealChangesShape)
-        {
-            _shapePath?.Dispose();
-            _shapePath = CreateShapePath(width, height, scale, style, shapeProgress, revealProgress);
-            _cachedStyle = style;
-            _cachedShapeProgress = shapeProgress;
-            _cachedShapeWidth = width;
-            _cachedShapeHeight = height;
-            _cachedScale = scale;
-            _cachedRevealProgress = revealProgress;
         }
 
         if (_blurPaint is null || !_cachedOptions.Equals(options))
@@ -223,10 +246,43 @@ internal sealed class SkiaBlurRenderer : IDisposable
                 ImageFilter = _blurFilter
             };
             _cachedOptions = options;
+            _backdropValid = false;
         }
 
         _tintPaint ??= new SKPaint { IsAntialias = true };
         _tintPaint.Color = new SKColor(options.TintR, options.TintG, options.TintB, options.TintAlpha);
+        _cachedScale = scale;
+    }
+
+    private void EnsureShapePath(
+        int width,
+        int height,
+        double scale,
+        int style,
+        double shapeProgress,
+        double revealProgress)
+    {
+        var shapeChanged = Math.Abs(_cachedShapeProgress - shapeProgress) > 0.001;
+        var revealChangesShape = style == 1 && Math.Abs(_cachedRevealProgress - revealProgress) > 0.001;
+        if (_shapePath is not null
+            && _cachedStyle == style
+            && _cachedShapeWidth == width
+            && _cachedShapeHeight == height
+            && Math.Abs(_cachedScale - scale) <= 0.001
+            && !shapeChanged
+            && !revealChangesShape)
+        {
+            return;
+        }
+
+        _shapePath?.Dispose();
+        _shapePath = CreateShapePath(width, height, scale, style, shapeProgress, revealProgress);
+        _cachedStyle = style;
+        _cachedShapeProgress = shapeProgress;
+        _cachedShapeWidth = width;
+        _cachedShapeHeight = height;
+        _cachedScale = scale;
+        _cachedRevealProgress = revealProgress;
     }
 
     private static SKPath CreateShapePath(int width, int height, double scale, int style, double shapeProgress, double revealProgress)
@@ -285,16 +341,13 @@ internal sealed class SkiaBlurRenderer : IDisposable
 
     private void EnsureBuffers(int width, int height)
     {
-        if (width <= _width && height <= _height && _captureDc != IntPtr.Zero && _outputDc != IntPtr.Zero)
+        if (width <= _capacityWidth && height <= _capacityHeight && _captureDc != IntPtr.Zero && _outputDc != IntPtr.Zero)
         {
             return;
         }
 
-        // A shell morph changes by only a few pixels per frame. Exact-sized DIBs
-        // forced GDI + Skia teardown/reallocation almost every frame. Keep a
-        // reusable capacity buffer and only grow it when a real layout exceeds it.
-        var capacityWidth = GrowCapacity(_width, width, 1920);
-        var capacityHeight = GrowCapacity(_height, height, 640);
+        var capacityWidth = GrowCapacity(_capacityWidth, width, 1920);
+        var capacityHeight = GrowCapacity(_capacityHeight, height, 640);
         ReleaseBuffers();
 
         var screenDc = GetDC(IntPtr.Zero);
@@ -322,8 +375,9 @@ internal sealed class SkiaBlurRenderer : IDisposable
 
             _captureOld = SelectObject(_captureDc, _captureBitmap);
             _outputOld = SelectObject(_outputDc, _outputBitmap);
-            _width = capacityWidth;
-            _height = capacityHeight;
+            _capacityWidth = capacityWidth;
+            _capacityHeight = capacityHeight;
+            _backdropValid = false;
         }
         finally
         {
@@ -363,14 +417,8 @@ internal sealed class SkiaBlurRenderer : IDisposable
     {
         ReleaseSkiaResources();
 
-        if (_captureDc != IntPtr.Zero && _captureOld != IntPtr.Zero)
-        {
-            SelectObject(_captureDc, _captureOld);
-        }
-        if (_outputDc != IntPtr.Zero && _outputOld != IntPtr.Zero)
-        {
-            SelectObject(_outputDc, _outputOld);
-        }
+        if (_captureDc != IntPtr.Zero && _captureOld != IntPtr.Zero) SelectObject(_captureDc, _captureOld);
+        if (_outputDc != IntPtr.Zero && _outputOld != IntPtr.Zero) SelectObject(_outputDc, _outputOld);
         if (_captureBitmap != IntPtr.Zero) DeleteObject(_captureBitmap);
         if (_outputBitmap != IntPtr.Zero) DeleteObject(_outputBitmap);
         if (_captureDc != IntPtr.Zero) DeleteDC(_captureDc);
@@ -378,7 +426,8 @@ internal sealed class SkiaBlurRenderer : IDisposable
 
         _captureDc = _captureBitmap = _captureOld = _captureBits = IntPtr.Zero;
         _outputDc = _outputBitmap = _outputOld = _outputBits = IntPtr.Zero;
-        _width = _height = 0;
+        _capacityWidth = _capacityHeight = 0;
+        _backdropValid = false;
     }
 
     private void ReleaseSkiaResources()
