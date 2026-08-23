@@ -23,6 +23,7 @@ internal sealed class BlurWindow : IDisposable
     private const int WmNcHitTest = 0x0084;
     private const int HtTransparent = -1;
     private const string RevealProgressProperty = "TopIsland.BlurRevealProgress";
+    private const string ShapeProgressProperty = "TopIsland.BlurShapeProgress";
 
     private static readonly string WindowClass = $"TopIsland.BlurHost.{Environment.ProcessId}";
     private static readonly WndProcDelegate WndProcThunk = WndProc;
@@ -116,7 +117,9 @@ internal sealed class BlurWindow : IDisposable
         var height = Math.Max(1, rect.Bottom - rect.Top);
         var dpi = Math.Max(96, (int)GetDpiForWindow(_target));
         var scale = dpi / 96.0;
-        var expanded = height / scale > 120;
+        var legacyExpanded = height / scale > 120;
+        var shapeProgress = ReadProgress(ShapeProgressProperty, legacyExpanded ? 1.0 : 0.0);
+        var expanded = shapeProgress > 0.5;
 
         var now = Environment.TickCount64;
         var geometryChanged = !_hasLastTargetRect || !RectsEqual(rect, _lastTargetRect);
@@ -133,7 +136,8 @@ internal sealed class BlurWindow : IDisposable
         // rendering smoothly. Once the shell settles, back off to save GPU/CPU.
         var recentlyMoving = now - _lastGeometryChangeTick < 280;
         var revealInMotion = revealProgress > 0.001 && revealProgress < 0.999;
-        var intervalMs = recentlyMoving || revealInMotion
+        var shapeInMotion = shapeProgress > 0.001 && shapeProgress < 0.999;
+        var intervalMs = recentlyMoving || revealInMotion || shapeInMotion
             ? 4
             : width > 2600 || height > 600
                 ? 66
@@ -148,7 +152,7 @@ internal sealed class BlurWindow : IDisposable
                 height,
                 scale,
                 _settings.Style,
-                expanded,
+                shapeProgress,
                 revealProgress,
                 options))
             {
@@ -165,14 +169,14 @@ internal sealed class BlurWindow : IDisposable
     }
 
 
-    private double ReadRevealProgress()
+    private double ReadRevealProgress() => ReadProgress(RevealProgressProperty, 1.0);
+
+    private double ReadProgress(string propertyName, double fallback)
     {
-        var value = GetProp(_target, RevealProgressProperty).ToInt64();
+        var value = GetProp(_target, propertyName).ToInt64();
         if (value <= 0)
         {
-            // Backwards-compatible default if the main app has not published the
-            // property yet (for example during a mixed-version development run).
-            return 1.0;
+            return fallback;
         }
 
         return Math.Clamp((value - 1) / 1000.0, 0, 1);

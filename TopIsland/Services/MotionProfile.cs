@@ -7,10 +7,20 @@ public static class MotionProfile
     public static double Ease(double progress)
     {
         var t = Math.Clamp(progress, 0.0, 1.0);
-        // Smoothstep has zero velocity at both endpoints. Unlike the previous
-        // power ease-out it does not launch each transition at maximum speed,
-        // which was a major source of the visible "kick" on hover/reversal.
-        return t * t * (3.0 - 2.0 * t);
+        // Quintic smootherstep is C2-continuous: position, velocity and
+        // acceleration all settle at both ends. That removes the small jerk the
+        // cubic smoothstep still showed when a shell reached its final size.
+        return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+    }
+
+    public static double EaseRange(double value, double start, double end)
+    {
+        if (end <= start)
+        {
+            return value >= end ? 1.0 : 0.0;
+        }
+
+        return Ease(Math.Clamp((value - start) / (end - start), 0.0, 1.0));
     }
 
     public static IEasingFunction CreateWpfEasing() =>
@@ -29,9 +39,8 @@ public static class MotionProfile
             0.0,
             1.0);
 
-        // Keep short reversals responsive without collapsing them into a 60 ms
-        // snap. Every property in a surface transition uses this same duration.
-        var durationScale = 0.78 + 0.22 * Math.Sqrt(distanceFactor);
-        return Math.Max(110, (int)Math.Round(baseDurationMs * durationScale));
+        // Keep short reversals responsive without collapsing them into a snap.
+        var durationScale = 0.76 + 0.24 * Math.Sqrt(distanceFactor);
+        return Math.Max(108, (int)Math.Round(baseDurationMs * durationScale));
     }
 }

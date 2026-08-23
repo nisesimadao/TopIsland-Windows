@@ -46,7 +46,9 @@ internal sealed class SkiaBlurRenderer : IDisposable
     private SKPaint? _blurPaint;
     private SKPaint? _tintPaint;
     private int _cachedStyle = int.MinValue;
-    private bool _cachedExpanded;
+    private double _cachedShapeProgress = -1;
+    private int _cachedShapeWidth = -1;
+    private int _cachedShapeHeight = -1;
     private double _cachedScale = -1;
     private double _cachedRevealProgress = -1;
     private BlurFrameOptions _cachedOptions;
@@ -63,7 +65,7 @@ internal sealed class SkiaBlurRenderer : IDisposable
         int height,
         double scale,
         int style,
-        bool expanded,
+        double shapeProgress,
         double revealProgress,
         BlurFrameOptions options)
     {
@@ -89,7 +91,7 @@ internal sealed class SkiaBlurRenderer : IDisposable
                 return false;
             }
 
-            EnsureSkiaResources(width, height, scale, style, expanded, revealProgress, options);
+            EnsureSkiaResources(width, height, scale, style, shapeProgress, revealProgress, options);
             if (_sourceSkia is null || _outputCanvas is null || _blurSkia is null ||
                 _blurCanvas is null || _shapePath is null || _blurPaint is null || _tintPaint is null)
             {
@@ -100,15 +102,28 @@ internal sealed class SkiaBlurRenderer : IDisposable
             // blur discards the high-frequency detail that downsampling removes,
             // cutting filter cost sharply without changing the apparent radius.
             _blurCanvas.Clear(SKColors.Transparent);
-            var blurDestination = new SKRect(0, 0, _blurSkia.Width, _blurSkia.Height);
-            _blurCanvas.DrawBitmap(_sourceSkia, blurDestination, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None), _blurPaint);
+            var blurWidth = Math.Max(1, (int)Math.Ceiling(width * BlurWorkingScale));
+            var blurHeight = Math.Max(1, (int)Math.Ceiling(height * BlurWorkingScale));
+            var sourceRect = new SKRect(0, 0, width, height);
+            var blurDestination = new SKRect(0, 0, blurWidth, blurHeight);
+            _blurCanvas.DrawBitmap(
+                _sourceSkia,
+                sourceRect,
+                blurDestination,
+                new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None),
+                _blurPaint);
             _blurCanvas.Flush();
 
             _outputCanvas.Clear(SKColors.Transparent);
             _outputCanvas.Save();
             _outputCanvas.ClipPath(_shapePath, SKClipOperation.Intersect, antialias: true);
+            var blurSource = new SKRect(0, 0, blurWidth, blurHeight);
             var outputDestination = new SKRect(0, 0, width, height);
-            _outputCanvas.DrawBitmap(_blurSkia, outputDestination, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
+            _outputCanvas.DrawBitmap(
+                _blurSkia,
+                blurSource,
+                outputDestination,
+                new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
 
             if (options.TintAlpha > 0)
             {
@@ -153,7 +168,7 @@ internal sealed class SkiaBlurRenderer : IDisposable
         int height,
         double scale,
         int style,
-        bool expanded,
+        double shapeProgress,
         double revealProgress,
         BlurFrameOptions options)
     {
@@ -161,10 +176,10 @@ internal sealed class SkiaBlurRenderer : IDisposable
         {
             _sourceSkia = new SKBitmap();
             _outputSkia = new SKBitmap();
-            var sourceInfo = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-            var outputInfo = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
-            if (!_sourceSkia.InstallPixels(sourceInfo, _captureBits, width * 4) ||
-                !_outputSkia.InstallPixels(outputInfo, _outputBits, width * 4))
+            var sourceInfo = new SKImageInfo(_width, _height, SKColorType.Bgra8888, SKAlphaType.Opaque);
+            var outputInfo = new SKImageInfo(_width, _height, SKColorType.Bgra8888, SKAlphaType.Premul);
+            if (!_sourceSkia.InstallPixels(sourceInfo, _captureBits, _width * 4) ||
+                !_outputSkia.InstallPixels(outputInfo, _outputBits, _width * 4))
             {
                 throw new InvalidOperationException("Could not attach Skia bitmaps to blur buffers.");
             }
@@ -176,13 +191,22 @@ internal sealed class SkiaBlurRenderer : IDisposable
             _blurCanvas = new SKCanvas(_blurSkia);
         }
 
+        var shapeChanged = Math.Abs(_cachedShapeProgress - shapeProgress) > 0.001;
         var revealChangesShape = style == 1 && Math.Abs(_cachedRevealProgress - revealProgress) > 0.001;
-        if (_shapePath is null || _cachedStyle != style || _cachedExpanded != expanded || Math.Abs(_cachedScale - scale) > 0.001 || revealChangesShape)
+        if (_shapePath is null
+            || _cachedStyle != style
+            || _cachedShapeWidth != width
+            || _cachedShapeHeight != height
+            || Math.Abs(_cachedScale - scale) > 0.001
+            || shapeChanged
+            || revealChangesShape)
         {
             _shapePath?.Dispose();
-            _shapePath = CreateShapePath(width, height, scale, style, expanded, revealProgress);
+            _shapePath = CreateShapePath(width, height, scale, style, shapeProgress, revealProgress);
             _cachedStyle = style;
-            _cachedExpanded = expanded;
+            _cachedShapeProgress = shapeProgress;
+            _cachedShapeWidth = width;
+            _cachedShapeHeight = height;
             _cachedScale = scale;
             _cachedRevealProgress = revealProgress;
         }
@@ -205,7 +229,7 @@ internal sealed class SkiaBlurRenderer : IDisposable
         _tintPaint.Color = new SKColor(options.TintR, options.TintG, options.TintB, options.TintAlpha);
     }
 
-    private static SKPath CreateShapePath(int width, int height, double scale, int style, bool expanded, double revealProgress)
+    private static SKPath CreateShapePath(int width, int height, double scale, int style, double shapeProgress, double revealProgress)
     {
         using var builder = new SKPathBuilder();
         var pad = (float)(16 * scale);
@@ -217,9 +241,10 @@ internal sealed class SkiaBlurRenderer : IDisposable
             var right = Math.Max(left + 1, width - pad);
             var bottom = Math.Max(top + 1, height - pad);
             var surfaceHeight = bottom - top;
-            var radius = expanded
-                ? Math.Min((float)(28 * scale), surfaceHeight / 2f)
-                : surfaceHeight / 2f;
+            shapeProgress = Math.Clamp(shapeProgress, 0, 1);
+            var compactRadius = surfaceHeight / 2f;
+            var expandedRadius = Math.Min((float)(28 * scale), compactRadius);
+            var radius = compactRadius + (expandedRadius - compactRadius) * (float)shapeProgress;
             builder.AddRoundRect(
                 new SKRoundRect(new SKRect(left, top, right, bottom), radius, radius),
                 SKPathDirection.Clockwise);
@@ -237,9 +262,10 @@ internal sealed class SkiaBlurRenderer : IDisposable
         var notchTop = 0f;
         var fullNotchBottom = Math.Max(1f, height - pad);
         var notchBottom = Math.Max(0.01f, (float)(fullNotchBottom * revealProgress));
+        shapeProgress = Math.Clamp(shapeProgress, 0, 1);
         var shoulderScale = Math.Pow(revealProgress, 1.18);
-        var topRadius = (float)((expanded ? 19.0 : 6.0) * scale * shoulderScale);
-        var bottomRadius = (float)((expanded ? 24.0 : 14.0) * scale * shoulderScale);
+        var topRadius = (float)((6.0 + (19.0 - 6.0) * shapeProgress) * scale * shoulderScale);
+        var bottomRadius = (float)((14.0 + (24.0 - 14.0) * shapeProgress) * scale * shoulderScale);
         topRadius = Math.Min(topRadius, notchBottom / 2f);
         bottomRadius = Math.Min(bottomRadius, notchBottom / 2f);
         bottomRadius = Math.Min(bottomRadius, Math.Max(1f, (notchRight - notchLeft) / 4f));
@@ -259,11 +285,16 @@ internal sealed class SkiaBlurRenderer : IDisposable
 
     private void EnsureBuffers(int width, int height)
     {
-        if (_width == width && _height == height && _captureDc != IntPtr.Zero && _outputDc != IntPtr.Zero)
+        if (width <= _width && height <= _height && _captureDc != IntPtr.Zero && _outputDc != IntPtr.Zero)
         {
             return;
         }
 
+        // A shell morph changes by only a few pixels per frame. Exact-sized DIBs
+        // forced GDI + Skia teardown/reallocation almost every frame. Keep a
+        // reusable capacity buffer and only grow it when a real layout exceeds it.
+        var capacityWidth = GrowCapacity(_width, width, 1920);
+        var capacityHeight = GrowCapacity(_height, height, 640);
         ReleaseBuffers();
 
         var screenDc = GetDC(IntPtr.Zero);
@@ -281,8 +312,8 @@ internal sealed class SkiaBlurRenderer : IDisposable
                 throw new InvalidOperationException("CreateCompatibleDC failed.");
             }
 
-            _captureBitmap = CreateTopDownDib(screenDc, width, height, out _captureBits);
-            _outputBitmap = CreateTopDownDib(screenDc, width, height, out _outputBits);
+            _captureBitmap = CreateTopDownDib(screenDc, capacityWidth, capacityHeight, out _captureBits);
+            _outputBitmap = CreateTopDownDib(screenDc, capacityWidth, capacityHeight, out _outputBits);
             if (_captureBitmap == IntPtr.Zero || _outputBitmap == IntPtr.Zero ||
                 _captureBits == IntPtr.Zero || _outputBits == IntPtr.Zero)
             {
@@ -291,13 +322,23 @@ internal sealed class SkiaBlurRenderer : IDisposable
 
             _captureOld = SelectObject(_captureDc, _captureBitmap);
             _outputOld = SelectObject(_outputDc, _outputBitmap);
-            _width = width;
-            _height = height;
+            _width = capacityWidth;
+            _height = capacityHeight;
         }
         finally
         {
             ReleaseDC(IntPtr.Zero, screenDc);
         }
+    }
+
+    private static int GrowCapacity(int current, int required, int minimum)
+    {
+        var capacity = Math.Max(current, minimum);
+        while (capacity < required)
+        {
+            capacity = checked((int)Math.Ceiling(capacity * 1.5));
+        }
+        return capacity;
     }
 
     private static IntPtr CreateTopDownDib(IntPtr dc, int width, int height, out IntPtr bits)
@@ -362,7 +403,9 @@ internal sealed class SkiaBlurRenderer : IDisposable
         _blurFilter = null;
         _tintPaint = null;
         _cachedStyle = int.MinValue;
-        _cachedExpanded = false;
+        _cachedShapeProgress = -1;
+        _cachedShapeWidth = -1;
+        _cachedShapeHeight = -1;
         _cachedScale = -1;
         _cachedRevealProgress = -1;
         _cachedOptions = default;

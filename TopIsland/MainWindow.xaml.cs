@@ -41,7 +41,17 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _discordTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _peekTimer = new();
     private readonly DispatcherTimer _collapseTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
-    private readonly DispatcherTimer _pointerTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    // MouseEnter remains immediate. This timer is only a safety net for the
+    // transparent/no-activate HWND, so it does not need to run every display frame.
+    private readonly DispatcherTimer _pointerTimer = new() { Interval = TimeSpan.FromMilliseconds(24) };
+    private readonly DispatcherTimer _motionTimer = new(DispatcherPriority.Normal)
+    {
+        Interval = TimeSpan.FromMilliseconds(8)
+    };
+    private readonly DispatcherTimer _secondaryResumeTimer = new(DispatcherPriority.Background)
+    {
+        Interval = TimeSpan.FromMilliseconds(650)
+    };
     private readonly SemaphoreSlim _mediaRefreshGate = new(1, 1);
     private readonly SemaphoreSlim _notificationRefreshGate = new(1, 1);
     private readonly SemaphoreSlim _discordRefreshGate = new(1, 1);
@@ -64,6 +74,13 @@ public partial class MainWindow : Window
     private bool _externalBlurAvailable;
     private bool _windowTransitionActive;
     private bool _surfaceMotionFrameInProgress;
+    private bool _highResolutionMotionTimerActive;
+    private bool _motionPollingSuspended;
+    private bool _resumeStatsAfterMotion;
+    private bool _resumeMediaAfterMotion;
+    private bool _resumeThemeAfterMotion;
+    private readonly RectangleGeometry _compactContentClip = new();
+    private readonly RectangleGeometry _expandedContentClip = new();
     private long _windowTransitionStartedTimestamp;
     private int _windowTransitionDurationMs;
     private double _windowFromWidth;
@@ -72,9 +89,6 @@ public partial class MainWindow : Window
     private double _windowFromShapeProgress;
     private double _windowFromRevealProgress;
     private double _windowFromSurfaceOpacity;
-    private double _windowFromCompactOpacity;
-    private double _windowFromExpandedOpacity;
-    private double _windowFromExpandedTranslate;
     private double _windowFromShadowBlur;
     private double _windowFromShadowOpacity;
     private double _windowToWidth;
@@ -83,9 +97,6 @@ public partial class MainWindow : Window
     private double _windowToShapeProgress;
     private double _windowToRevealProgress;
     private double _windowToSurfaceOpacity;
-    private double _windowToCompactOpacity;
-    private double _windowToExpandedOpacity;
-    private double _windowToExpandedTranslate;
     private double _windowToShadowBlur;
     private double _windowToShadowOpacity;
     private double _renderedWidth;
@@ -111,7 +122,11 @@ public partial class MainWindow : Window
         _peekTimer.Tick += PeekTimer_Tick;
         _collapseTimer.Tick += CollapseTimer_Tick;
         _pointerTimer.Tick += PointerTimer_Tick;
+        _motionTimer.Tick += MotionTimer_Tick;
+        _secondaryResumeTimer.Tick += SecondaryResumeTimer_Tick;
         _transitionGuardTimer.Tick += TransitionGuardTimer_Tick;
+        CompactBar.Clip = _compactContentClip;
+        ExpandedPanel.Clip = _expandedContentClip;
         _statsTimer.Tick += StatsTimer_Tick;
         _mediaTimer.Tick += MediaTimer_Tick;
         _themeTimer.Tick += ThemeTimer_Tick;
@@ -142,6 +157,7 @@ public partial class MainWindow : Window
 
         _currentMonitor = _monitorService.Resolve(_settings);
         BlurHostService.SetRevealProgress(_hwnd, 1.0);
+        BlurHostService.SetShapeProgress(_hwnd, _shapeExpansionProgress);
         _externalBlurAvailable = RequiresLiveBlur(_settings.Material) && _blurHostService.Start(_hwnd);
         ApplyBackdropMaterial();
         PositionOnCurrentMonitor();
@@ -162,9 +178,12 @@ public partial class MainWindow : Window
         _peekTimer.Stop();
         _collapseTimer.Stop();
         _pointerTimer.Stop();
+        _motionTimer.Stop();
+        _secondaryResumeTimer.Stop();
         _transitionGuardTimer.Stop();
         StopWindowTransition();
         BlurHostService.ClearRevealProgress(_hwnd);
+        BlurHostService.ClearShapeProgress(_hwnd);
         _blurHostService.Dispose();
         _statsService.Dispose();
         _hardwareTelemetryService?.Dispose();
@@ -225,4 +244,10 @@ public partial class MainWindow : Window
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool ScreenToClient(IntPtr hwnd, ref NativePoint point);
+
+    [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
+    private static extern uint TimeBeginPeriod(uint period);
+
+    [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
+    private static extern uint TimeEndPeriod(uint period);
 }

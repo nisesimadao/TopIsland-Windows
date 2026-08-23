@@ -304,9 +304,9 @@ public partial class MainWindow
 
     private void UpdateCompactDensity()
     {
-        // During compact -> expanded cross-fade, changing visibility inside the
-        // outgoing compact tree causes a re-measure/pop before its opacity has
-        // reached zero. Keep that tree frozen until the coordinated motion ends.
+        // During compact -> expanded mask motion, changing visibility inside the
+        // outgoing compact tree would re-measure it while it is retracting. Keep
+        // that endpoint layout frozen until the coordinated motion ends.
         if (_windowTransitionActive && _state == SurfaceState.Expanded)
         {
             return;

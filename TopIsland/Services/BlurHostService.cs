@@ -9,6 +9,7 @@ public sealed class BlurHostService : IDisposable
     // HWND property shared with TopIsland.BlurHost. Encode 0..1 as 1..1001 so
     // GetProp == 0 can continue to mean "property unavailable / legacy host".
     internal const string RevealProgressProperty = "TopIsland.BlurRevealProgress";
+    internal const string ShapeProgressProperty = "TopIsland.BlurShapeProgress";
 
     private Process? _process;
 
@@ -66,6 +67,25 @@ public sealed class BlurHostService : IDisposable
         _ = SetProp(targetHwnd, RevealProgressProperty, new IntPtr(encoded));
     }
 
+    public static void SetShapeProgress(IntPtr targetHwnd, double progress)
+    {
+        if (targetHwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var encoded = 1 + (int)Math.Round(Math.Clamp(progress, 0, 1) * 1000);
+        _ = SetProp(targetHwnd, ShapeProgressProperty, new IntPtr(encoded));
+    }
+
+    public static void ClearShapeProgress(IntPtr targetHwnd)
+    {
+        if (targetHwnd != IntPtr.Zero)
+        {
+            _ = RemoveProp(targetHwnd, ShapeProgressProperty);
+        }
+    }
+
     public static void ClearRevealProgress(IntPtr targetHwnd)
     {
         if (targetHwnd != IntPtr.Zero)
@@ -73,6 +93,7 @@ public sealed class BlurHostService : IDisposable
             _ = RemoveProp(targetHwnd, RevealProgressProperty);
         }
     }
+
 
     public void Stop()
     {
