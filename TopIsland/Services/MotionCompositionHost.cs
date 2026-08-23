@@ -460,7 +460,7 @@ internal sealed class MotionCompositionHost : IDisposable
                 LayerOptions = LayerOptions1.None
             };
             dc.PushLayer(ref layerParameters, _contentLayer);
-            DrawContent(dc, request.Content, frame, scale, offsetY);
+            DrawContent(dc, request, frame, scale, offsetY);
             dc.PopLayer();
         }
         _surface.EndDraw().CheckError();
@@ -552,11 +552,12 @@ internal sealed class MotionCompositionHost : IDisposable
     }
     private void DrawContent(
         ID2D1DeviceContext dc,
-        MotionCompositionContent? content,
+        MotionCompositionRequest request,
         MotionCompositionFrame frame,
         float scale,
         float surfaceOffsetY)
     {
+        var content = request.Content;
         if (content is null || _compactBitmap is null || _expandedBitmap is null)
         {
             return;
@@ -564,7 +565,18 @@ internal sealed class MotionCompositionHost : IDisposable
 
         var expansion = Math.Clamp(frame.ShapeProgress, 0, 1);
         var compactExit = MotionProfile.CompactExit(expansion);
+        var collapsing = request.To.ShapeProgress + 0.001 < request.From.ShapeProgress;
+        var collapseProgress = collapsing
+            ? Math.Clamp(
+                (request.From.ShapeProgress - frame.ShapeProgress) /
+                Math.Max(0.001, request.From.ShapeProgress - request.To.ShapeProgress),
+                0.0,
+                1.0)
+            : 0.0;
 
+        var compactOpacity = collapsing
+            ? MotionProfile.EaseRange(collapseProgress, 0.48, 0.88)
+            : 1.0;
         var compact = content.Compact;
         var compactY = compact.Y - MotionProfile.CompactTravelY * compactExit;
         var compactDest = new Vortice.RawRectF(
@@ -572,8 +584,11 @@ internal sealed class MotionCompositionHost : IDisposable
             (float)(compactY * scale + surfaceOffsetY),
             (float)((compact.X + compact.Width) * scale),
             (float)((compactY + compact.Height) * scale + surfaceOffsetY));
-        dc.DrawBitmap(_compactBitmap, (Vortice.RawRectF?)compactDest, 1f,
-            Vortice.Direct2D1.InterpolationMode.Linear, null, null);
+        if (compactOpacity > 0.001)
+        {
+            dc.DrawBitmap(_compactBitmap, (Vortice.RawRectF?)compactDest, (float)compactOpacity,
+                Vortice.Direct2D1.InterpolationMode.Linear, null, null);
+        }
 
         var expanded = content.Expanded;
         var width = expanded.Width;
@@ -582,6 +597,54 @@ internal sealed class MotionCompositionHost : IDisposable
         var bottomStartY = Math.Clamp(content.BottomStartY, 1, Math.Max(1, height - 1));
         var bottomMiddleX = Math.Clamp(content.BottomMiddleX, 1, Math.Max(1, width - 2));
         var bottomRightX = Math.Clamp(content.BottomRightX, bottomMiddleX + 1, Math.Max(bottomMiddleX + 1, width - 1));
+        var bottomHeight = height - bottomStartY;
+
+        if (collapsing)
+        {
+            // During collapse the shell contracts around its own centre. Keep text/cards
+            // at their original size, but move each region centre with that contraction.
+            // Previously the expanded bitmap stayed in endpoint coordinates and the shell
+            // simply clipped across it, which made the contents look completely stationary.
+            var expandedFrame = request.From.ShapeProgress >= request.To.ShapeProgress
+                ? request.From
+                : request.To;
+            // Stop compressing before regions collide. The remaining transition is
+            // handed to the compact snapshot with a short crossfade.
+            var widthRatio = Math.Max(0.70,
+                Math.Clamp(frame.Width / Math.Max(1.0, expandedFrame.Width), 0.0, 1.0));
+            var heightRatio = Math.Max(0.68,
+                Math.Clamp(frame.Height / Math.Max(1.0, expandedFrame.Height), 0.0, 1.0));
+            var expandedOpacity = 1.0 - MotionProfile.EaseRange(collapseProgress, 0.42, 0.78);
+            var hostCenterX = request.HostWidthDip * 0.5;
+            var expandedTopInHost = expandedFrame.Top - request.HostTopDip;
+            var currentTopInHost = frame.Top - request.HostTopDip;
+
+            DrawCollapsingExpandedRegion(dc, expanded,
+                0, 0, topRightX, bottomStartY,
+                hostCenterX, expandedTopInHost, currentTopInHost,
+                widthRatio, heightRatio, expandedOpacity, scale, surfaceOffsetY);
+
+            DrawCollapsingExpandedRegion(dc, expanded,
+                topRightX, 0, width - topRightX, bottomStartY,
+                hostCenterX, expandedTopInHost, currentTopInHost,
+                widthRatio, heightRatio, expandedOpacity, scale, surfaceOffsetY);
+
+            DrawCollapsingExpandedRegion(dc, expanded,
+                0, bottomStartY, bottomMiddleX, bottomHeight,
+                hostCenterX, expandedTopInHost, currentTopInHost,
+                widthRatio, heightRatio, expandedOpacity, scale, surfaceOffsetY);
+
+            DrawCollapsingExpandedRegion(dc, expanded,
+                bottomMiddleX, bottomStartY, bottomRightX - bottomMiddleX, bottomHeight,
+                hostCenterX, expandedTopInHost, currentTopInHost,
+                widthRatio, heightRatio, expandedOpacity, scale, surfaceOffsetY);
+
+            DrawCollapsingExpandedRegion(dc, expanded,
+                bottomRightX, bottomStartY, width - bottomRightX, bottomHeight,
+                hostCenterX, expandedTopInHost, currentTopInHost,
+                widthRatio, heightRatio, expandedOpacity, scale, surfaceOffsetY);
+            return;
+        }
 
         var topLeftEnter = MotionProfile.ExpandedTopLeftEnter(expansion);
         var topRightEnter = MotionProfile.ExpandedTopRightEnter(expansion);
@@ -601,7 +664,6 @@ internal sealed class MotionCompositionHost : IDisposable
             +42.0 * (1.0 - topRightEnter),
             scale, surfaceOffsetY);
 
-        var bottomHeight = height - bottomStartY;
         DrawExpandedRegion(dc, expanded,
             0, bottomStartY, bottomMiddleX, bottomHeight,
             +56.0 * (1.0 - bottomLeftEnter),
@@ -621,6 +683,42 @@ internal sealed class MotionCompositionHost : IDisposable
             scale, surfaceOffsetY);
     }
 
+    private void DrawCollapsingExpandedRegion(
+        ID2D1DeviceContext dc,
+        MotionCompositionBitmap bitmap,
+        double x,
+        double y,
+        double width,
+        double height,
+        double hostCenterX,
+        double expandedTopInHost,
+        double currentTopInHost,
+        double widthRatio,
+        double heightRatio,
+        double opacity,
+        float scale,
+        float surfaceOffsetY)
+    {
+        var regionCenterX = bitmap.X + x + width * 0.5;
+        var regionCenterY = bitmap.Y + y + height * 0.5;
+        var desiredCenterX = hostCenterX + (regionCenterX - hostCenterX) * widthRatio;
+        var relativeCenterY = regionCenterY - expandedTopInHost;
+        var desiredCenterY = currentTopInHost + relativeCenterY * heightRatio;
+
+        DrawExpandedRegion(
+            dc,
+            bitmap,
+            x,
+            y,
+            width,
+            height,
+            desiredCenterX - regionCenterX,
+            desiredCenterY - regionCenterY,
+            scale,
+            surfaceOffsetY,
+            opacity);
+    }
+
     private void DrawExpandedRegion(
         ID2D1DeviceContext dc,
         MotionCompositionBitmap bitmap,
@@ -631,7 +729,8 @@ internal sealed class MotionCompositionHost : IDisposable
         double translateX,
         double translateY,
         float scale,
-        float surfaceOffsetY)
+        float surfaceOffsetY,
+        double opacity = 1.0)
     {
         if (_expandedBitmap is null || width <= 0.1 || height <= 0.1 || bitmap.Width <= 0 || bitmap.Height <= 0)
         {
@@ -651,7 +750,11 @@ internal sealed class MotionCompositionHost : IDisposable
             (float)(destTop * scale + surfaceOffsetY),
             (float)((destLeft + width) * scale),
             (float)((destTop + height) * scale + surfaceOffsetY));
-        dc.DrawBitmap(_expandedBitmap, (Vortice.RawRectF?)dest, 1f,
+        if (opacity <= 0.001)
+        {
+            return;
+        }
+        dc.DrawBitmap(_expandedBitmap, (Vortice.RawRectF?)dest, (float)Math.Clamp(opacity, 0.0, 1.0),
             Vortice.Direct2D1.InterpolationMode.Linear, (Vortice.RawRectF?)source, null);
     }
     private static ID2D1Geometry? CreateGeometry(
