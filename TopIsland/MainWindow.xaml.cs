@@ -25,7 +25,8 @@ public partial class MainWindow : Window
     private readonly WindowRegionService _windowRegionService = new();
     private readonly StartupService _startupService = new();
     private readonly DownloadMonitorService _downloadMonitorService = new();
-    private readonly FocusTimerService _focusTimerService = new();
+    private readonly StayAwakeService _stayAwakeService = new();
+    private readonly PowerModeService _powerModeService = new();
     private NotificationService? _notificationService;
     private DiscordVoiceService? _discordVoiceService;
     private HardwareTelemetryService? _hardwareTelemetryService;
@@ -74,7 +75,7 @@ public partial class MainWindow : Window
     private int _notificationCount;
     private int _activeDownloadCount;
     private bool _hasMediaSession;
-    private bool _focusIsRunning;
+    private bool _updatingVolumeControl;
     private long _monitorTransitionSerial;
     private bool _externalBlurAvailable;
     private bool _windowTransitionActive;
@@ -217,6 +218,7 @@ public partial class MainWindow : Window
         _audioStatusService?.Dispose();
         _audioStatusService = null;
         _lastAudioStatus = AudioStatusSnapshot.Unavailable;
+        _stayAwakeService.Dispose();
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)

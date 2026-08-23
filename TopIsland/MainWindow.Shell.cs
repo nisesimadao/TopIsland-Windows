@@ -347,10 +347,7 @@ public partial class MainWindow
         CompactDownloadIndicator.Visibility = showIndicators && _activeDownloadCount > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         var showContextualActivity = baseWidth < 1400 && hoverOrPeek && (baseWidth >= 520 || (peek && baseWidth >= 480));
-        var showFocusControl = showContextualActivity && _focusIsRunning;
-        CompactFocusGroup.Visibility = showFocusControl ? Visibility.Visible : Visibility.Collapsed;
         CompactActivityText.Visibility = showContextualActivity
-            && !showFocusControl
             && !string.IsNullOrWhiteSpace(CompactActivityText.Text)
             ? Visibility.Visible
             : Visibility.Collapsed;

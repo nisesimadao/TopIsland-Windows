@@ -37,7 +37,7 @@ TopIslandは、Windowsの画面上部中央に常駐し、必要なときだけ�
 - NetworkのDownload / Upload速度
 - システムドライブの空き容量 / 総容量
 - `.crdownload` / `.part`など実際に進行しているDownloadと実測転送速度
-- 25分 / 45分の**Focus Timer**、Pause / Resume / Reset
+- Windows出力Volumeのドラッグ/Mute、Stay Awake、利用可能なPower modeを直接操作する**CONTROLS**
 - 許可済みの場合のみWindows通知の件数、アプリ名、最新テキストと、本当に通知を消すClear all
 - Battery搭載機のみ残量 / 充電状態
 - 時刻 / 日付
@@ -50,20 +50,20 @@ Windows通知の権限は起動時に勝手に要求しません。許可がな�
 - **Hover** — わずかに広く・深くなる
 - **Reveal on top edge** — 任意でIdle時に完全非表示・クリック透過にし、画面上端中央へポインタを持っていくとふわっと再表示
 - **Peek** — Full Expandせず、優先度の低い情報を少し追加
-- **Expanded** — 上段は Context / Now Playing、中央の大きな時計＋CPU/GPU/RAM＋Power/温度＋Discord VC操作（VCがない時はOutput/Volume）、通知がある時だけNotifications。下段はTimers、通常時はSESSION、Download中だけDOWNLOADSへ置換、右にStorage / Network / Hardware/Uptimeです
+- **Expanded** — 上段は Context / Now Playing、中央の大きな時計＋CPU/GPU/RAM＋Power/温度＋Discord VC操作（VCがない時はOutput/Volume）、通知がある時だけNotifications。下段はCONTROLS、通常時はSESSION、Download中だけDOWNLOADSへ置換、右にStorage / Network / Hardware/Uptimeです
 
-幅が狭い場合は文字を無理に縮めず、優先度の低い情報を落とします。空モジュールは場所を取りません。Downloadsはpartial fileが実際に更新中の時だけ表示し、それ以外は同じ中央レーンをSESSION（前面プロセスのCPU/メモリ/起動時間）として使います。Discord操作はVC接続中だけ、Notificationsは存在する時だけ表示します。Full Widthでは余った中央をFocus / Voice / Downloads / Network / Storageに使い、Media本文を横へ引き伸ばしません。
+幅が狭い場合は文字を無理に縮めず、優先度の低い情報を落とします。空モジュールは場所を取りません。Downloadsはpartial fileが実際に更新中の時だけ表示し、それ以外は同じ中央レーンをSESSION（前面プロセスのCPU/メモリ/起動時間）として使います。Discord操作はVC接続中だけ、Notificationsは存在する時だけ表示します。Full Widthでは余った中央をStay Awake / Voice / Downloads / Network / Storageに使い、Media本文を横へ引き伸ばしません。
 
 ## Screenshots
 
 <table>
   <tr>
     <td align="center"><b>Compact Notch Idle · labeled CPU/RAM</b></td>
-    <td align="center"><b>Hover · active Focus control</b></td>
+    <td align="center"><b>Hover · active state indicator</b></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/compact-idle.png" alt="TopIsland compact Notch idle with labeled open-right CPU and RAM meters"></td>
-    <td><img src="docs/screenshots/compact-hover-focus.png" alt="TopIsland hover with running Focus timer and pause control"></td>
+    <td><img src="docs/screenshots/compact-hover-focus.png" alt="TopIsland hover state indicator"></td>
   </tr>
 </table>
 <table>
@@ -95,7 +95,7 @@ TopIsland本体を設定画面化せず、Trayアイコンの右クリックか�
 - Width: Authentic / Compact / Standard / Wide / Full Width
 - Material / Theme
 - Display: Follow active app / Primary / 固定モニター
-- Focus timer: 25分 / 45分 / Pause-Resume / Reset
+- CONTROLS: 出力Volumeのドラッグ/Mute、Stay Awake、利用可能なPower mode切替
 - 必要な場合のみEnable notifications
 - Launch at startup
 - Quit
@@ -203,4 +203,4 @@ powershell -ExecutionPolicy Bypass -File scripts/uninstall-local.ps1
 
 ## 現在の状態
 
-まだ完成版ではありませんが、Media/前面アプリ、CPU/GPU/RAM/Network/Storage、Focus/Download監視、許可済みWindows通知、hidden Discord windowを含むVC状態/操作、Notch/Dynamic geometry、Hover/Peek/Expanded motion、クリック透過、フォーカス維持、Tray設定、設定保存、マルチモニター、PerMonitorV2、Material You、shape-clipped Live Blurまで動作しています。
+まだ完成版ではありませんが、Media/前面アプリ、CPU/GPU/RAM/Network/Storage、Windows Volume/Stay Awake/Power controls、Download監視、許可済みWindows通知、hidden Discord windowを含むVC状態/操作、Notch/Dynamic geometry、Hover/Peek/Expanded motion、クリック透過、フォーカス維持、Tray設定、設定保存、マルチモニター、PerMonitorV2、Material You、shape-clipped Live Blurまで動作しています。

@@ -37,7 +37,7 @@ TopIsland currently uses real Windows/application data for:
 - Network download/upload throughput
 - System-drive free/total storage
 - Active browser/download-manager partial downloads, including current bytes and measured transfer speed when available
-- Built-in **Focus timer** with 25/45-minute presets, pause/resume, reset and an Expanded progress indicator while active
+- **CONTROLS** lane with real output-volume drag/mute, Stay Awake, and available Windows power-mode cycling
 - Windows notifications: count, source app, app logo when Windows exposes it (initial badge fallback), latest text when notification-listener access is allowed, plus a real Clear all action
 - Battery level/charging state on devices that actually have a battery
 - Clock and date
@@ -49,24 +49,24 @@ Notification permission is never requested automatically. If access is not alrea
 - **Idle** — media/app context, clock, open-right tachometer-style usage gauges labeled **CPU / RAM**, plus compact activity indicators when the selected width allows them
 - **Hover** — subtly wider/deeper
 - **Reveal on top edge** — optional mode that hides the idle surface and keeps the hidden region click-through. For Notch, reaching the top-center edge grows the surface downward from the physical screen boundary: the inverse-R shoulders stay anchored at the top edge and increase their radius as the body emerges, rather than fading in
-- Hover gives a running Focus timer its own remaining-time + real Pause/Resume control before lower-priority activity text
+- Hover can show an active Stay Awake indicator before lower-priority activity text
 - **Peek** — reveals selected lower-priority information without opening the full surface
-- **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM, Power/Thermal and Discord voice controls (or Output/Volume when not in voice), plus Notifications when present. The lower row is Timers, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware/Uptime
+- **Expanded** — Context/Now Playing, a large clock-centered Overview with CPU/GPU/RAM, Power/Thermal and Discord voice controls (or Output/Volume when not in voice), plus Notifications when present. The lower row is CONTROLS, SESSION (foreground process telemetry) or active Downloads, and Storage / Network / Hardware/Uptime
 
 Surface transitions use one frame-coherent motion timeline for window size/position, shell geometry, reveal progress, compact/expanded content, and shadow opacity. State reversals resume from the currently rendered values instead of restarting independent animations, and WPF layout is synchronized with each rendered size frame to avoid one-frame shell/content lag.
 
-Smaller widths remove information instead of shrinking every label. When no download is moving, the lower middle lane shows the foreground **SESSION** (process, memory, CPU, threads and uptime); an actively changing partial download replaces that lane instead of creating another permanent card. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Focus / Voice / active Downloads / Network / Storage instead of stretching artwork or text. Its right-edge settings gear opens the same real TopIsland context menu used by the tray/overlay. The Expanded clock remains the visual anchor above the two-row information layout.
+Smaller widths remove information instead of shrinking every label. When no download is moving, the lower middle lane shows the foreground **SESSION** (process, memory, CPU, threads and uptime); an actively changing partial download replaces that lane instead of creating another permanent card. Discord controls appear only while voice is connected, and Notifications collapse when unavailable. Full Width uses the otherwise empty center for Stay Awake / Voice / active Downloads / Network / Storage instead of stretching artwork or text. Its right-edge settings gear opens the same real TopIsland context menu used by the tray/overlay. The Expanded clock remains the visual anchor above the two-row information layout.
 
 ## Screenshots
 
 <table>
   <tr>
     <td align="center"><b>Compact Notch Idle · labeled CPU/RAM</b></td>
-    <td align="center"><b>Hover · active Focus control</b></td>
+    <td align="center"><b>Hover · active state indicator</b></td>
   </tr>
   <tr>
     <td><img src="docs/screenshots/compact-idle.png" alt="TopIsland compact Notch idle with labeled open-right CPU and RAM meters"></td>
-    <td><img src="docs/screenshots/compact-hover-focus.png" alt="TopIsland hover with running Focus timer and pause control"></td>
+    <td><img src="docs/screenshots/compact-hover-focus.png" alt="TopIsland hover state indicator"></td>
   </tr>
 </table>
 <table>
@@ -98,7 +98,7 @@ Right-click the TopIsland tray icon to configure the app without turning the ove
 - Width: Authentic / Compact / Standard / Wide / Full Width
 - Material and theme
 - Display: Follow active app / Primary / a fixed connected display
-- Focus timer: 25 min / 45 min / Pause-Resume / Reset
+- CONTROLS: output-volume drag/mute, Stay Awake, and available power-mode cycling
 - Enable notifications when Windows access is not already allowed
 - Launch at startup
 - Quit
@@ -204,7 +204,7 @@ Local installation uses `%LOCALAPPDATA%\Programs\TopIsland` and creates a Start 
 
 ## Status
 
-TopIsland is still an interactive prototype, but its core overlay is functional: media/foreground context, the contextual Expanded layout, hidden-window Discord voice-state/control integration, focus/download monitoring, Windows notification reading when permitted, geometry/motion, click-through and no-activate behavior, system-tray configuration, persistence, multi-display placement, PerMonitorV2 scaling, Material You dynamic color, and shape-clipped live blur materials are working.
+TopIsland is still an interactive prototype, but its core overlay is functional: media/foreground context, the contextual Expanded layout, Windows volume/Stay Awake/power controls, hidden-window Discord voice-state/control integration, download monitoring, Windows notification reading when permitted, geometry/motion, click-through and no-activate behavior, system-tray configuration, persistence, multi-display placement, PerMonitorV2 scaling, Material You dynamic color, and shape-clipped live blur materials are working.
 
 ### Product video renderer
 

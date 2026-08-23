@@ -467,34 +467,45 @@ public partial class MainWindow
         ExpandedArtworkGlyphPath.Visibility = Visibility.Visible;
     }
 
-    private void FocusToggleButton_Click(object sender, RoutedEventArgs e)
+    private void VolumeMuteButton_Click(object sender, RoutedEventArgs e)
     {
-        _focusTimerService.Toggle();
-        UpdateLiveData();
+        _audioStatusService ??= new AudioStatusService();
+        _lastAudioStatus = _audioStatusService.ToggleMute();
+        UpdateControls(_lastAudioStatus, _powerModeService.Sample());
+        UpdateOverviewAuxiliaryVisibility(_discordVoiceService?.Current.IsConnected == true);
+        InvalidateMotionCompositionContent();
     }
 
-    private void Break45Button_Click(object sender, RoutedEventArgs e)
+    private void ControlVolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        _focusTimerService.Start(TimeSpan.FromMinutes(45));
-        UpdateLiveData();
+        if (_updatingVolumeControl || !ControlVolumeSlider.IsMouseCaptureWithin)
+        {
+            return;
+        }
+
+        _audioStatusService ??= new AudioStatusService();
+        _lastAudioStatus = _audioStatusService.SetVolume(e.NewValue);
+        UpdateControls(_lastAudioStatus, _powerModeService.Sample());
+        UpdateOverviewAuxiliaryVisibility(_discordVoiceService?.Current.IsConnected == true);
+        InvalidateMotionCompositionContent();
     }
 
-    public void StartFocusTimer(int minutes)
+    private void StayAwakeButton_Click(object sender, RoutedEventArgs e)
     {
-        _focusTimerService.Start(TimeSpan.FromMinutes(Math.Clamp(minutes, 1, 180)));
-        UpdateLiveData();
+        _ = _stayAwakeService.SetEnabled(!_stayAwakeService.IsEnabled);
+        UpdateControls(_lastAudioStatus, _powerModeService.Sample());
+        InvalidateMotionCompositionContent();
     }
 
-    public void ToggleFocusTimer()
+    private void PowerModeButton_Click(object sender, RoutedEventArgs e)
     {
-        _focusTimerService.Toggle();
-        UpdateLiveData();
-    }
-
-    public void ResetFocusTimer()
-    {
-        _focusTimerService.Reset();
-        UpdateLiveData();
+        var power = _powerModeService.Cycle();
+        UpdateControls(_lastAudioStatus, power);
+        if (power.Available)
+        {
+            OverviewPowerText.Text = power.ActiveLabel;
+        }
+        InvalidateMotionCompositionContent();
     }
 
     private async void MediaSeekSlider_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -656,28 +667,10 @@ public partial class MainWindow
             DownloadDetailText.Text = string.Empty;
         }
 
-        var focus = _focusTimerService.Snapshot();
-        FocusTimerLabelText.Text = focus.Duration >= TimeSpan.FromMinutes(40) ? "Break" : "Focus";
-        FocusTimerText.Text = focus.Display;
-        var focusProgress = focus.Duration.TotalMilliseconds > 0
-            ? Math.Clamp(1 - focus.Remaining.TotalMilliseconds / focus.Duration.TotalMilliseconds, 0, 1)
-            : 0;
-        FocusTimerProgressBar.Value = focusProgress;
-        FocusTimerProgressBar.Visibility = focus.IsRunning || focusProgress > 0.001
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        _focusIsRunning = focus.IsRunning;
-        CompactFocusText.Text = $"Focus {focus.Display}";
-        CompactFocusPlayIconViewbox.Visibility = focus.IsRunning ? Visibility.Collapsed : Visibility.Visible;
-        CompactFocusPauseIconViewbox.Visibility = focus.IsRunning ? Visibility.Visible : Visibility.Collapsed;
-        FullFocusText.Text = focus.Display;
-        FocusPlayIconViewbox.Visibility = focus.IsRunning ? Visibility.Collapsed : Visibility.Visible;
-        FocusPauseIconViewbox.Visibility = focus.IsRunning ? Visibility.Visible : Visibility.Collapsed;
-
         var activity = new List<string>();
-        if (focus.IsRunning)
+        if (_stayAwakeService.IsEnabled)
         {
-            activity.Add($"Focus {focus.Display}");
+            activity.Add("Awake");
         }
         DownloadActivityProgressBar.Visibility = downloads.HasActive ? Visibility.Visible : Visibility.Collapsed;
 
@@ -713,7 +706,40 @@ public partial class MainWindow
         }
         var visibleActivity = compactBaseWidth < 900 ? activity.Take(1) : activity;
         CompactActivityText.Text = string.Join("  \u00B7  ", visibleActivity);
+        UpdateControls(_lastAudioStatus, _powerModeService.Sample());
         UpdateCompactDensity();
+    }
+
+    private void UpdateControls(AudioStatusSnapshot audio, PowerModeSnapshot power)
+    {
+        _updatingVolumeControl = true;
+        try
+        {
+            ControlVolumeText.Text = audio.Available
+                ? audio.Muted ? "Muted" : $"{audio.VolumePercent:0}%"
+                : "--";
+            ControlVolumeSlider.IsEnabled = audio.Available;
+            ControlVolumeSlider.Value = audio.Available ? audio.VolumePercent : 0;
+            VolumeMuteButton.IsEnabled = audio.Available;
+            VolumeSpeakerIcon.Visibility = audio.Available && !audio.Muted ? Visibility.Visible : Visibility.Collapsed;
+            VolumeMutedIcon.Visibility = audio.Muted ? Visibility.Visible : Visibility.Collapsed;
+
+            StayAwakeText.Text = _stayAwakeService.IsEnabled ? "On" : "Off";
+            FullAwakeText.Text = StayAwakeText.Text;
+            PowerModeText.Text = power.ActiveLabel;
+            PowerModeButton.IsEnabled = power.Available && power.Options.Count > 1;
+        }
+        finally
+        {
+            _updatingVolumeControl = false;
+        }
+    }
+
+    private void InvalidateMotionCompositionContent()
+    {
+        _cachedMotionCompositionContent = null;
+        _cachedMotionCompositionContentKey = null;
+        _ = Dispatcher.BeginInvoke(RefreshMotionCompositionContentCache, DispatcherPriority.Background);
     }
 
     private void UpdateDownloadColumnVisibility(bool hasActiveDownloads)
